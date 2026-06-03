@@ -1,0 +1,487 @@
+.dw-root {
+  --dw-bg: #c7d2fe;
+  --dw-bg-soft: #e0e7ff;
+  --dw-panel: #cdd8ff;
+  --dw-card: #e0e7ff;
+  --dw-card-hover: #eef2ff;
+  --dw-text: #4f46e5;
+  --dw-text-soft: #6366f1;
+  --dw-control: #a5b4fc;
+  --dw-control-soft: #c7d2fe;
+  --dw-modal-bg: #9f8978;
+  --dw-shadow: 0 14px 35px rgba(67, 56, 202, 0.24), 0 4px 12px rgba(49, 46, 129, 0.16);
+  --dw-shadow-soft: 0 10px 22px rgba(79, 70, 229, 0.2);
+  --dw-shadow-inset: inset 0 2px 7px rgba(255, 255, 255, 0.55), 0 8px 18px rgba(67, 56, 202, 0.2);
+  --dw-radius-lg: 18px;
+  --dw-transition: 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  color: var(--dw-text);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.dw-root.dark {
+  --dw-bg: #1e1b4b;
+  --dw-bg-soft: #111827;
+  --dw-panel: #18122f;
+  --dw-card: #312e81;
+  --dw-card-hover: #3730a3;
+  --dw-text: #a5b4fc;
+  --dw-text-soft: #818cf8;
+  --dw-control: #6366f1;
+  --dw-control-soft: #1e1b4b;
+  --dw-modal-bg: #26202b;
+  --dw-shadow: 0 16px 40px rgba(0, 0, 0, 0.46), 0 2px 10px rgba(15, 23, 42, 0.44);
+  --dw-shadow-soft: 0 10px 24px rgba(0, 0, 0, 0.38);
+  --dw-shadow-inset: inset 0 2px 7px rgba(255, 255, 255, 0.12), 0 8px 18px rgba(0, 0, 0, 0.3);
+}
+
+.dw-root *,
+.dw-root *::before,
+.dw-root *::after {
+  box-sizing: border-box;
+}
+
+.dw-viewport {
+  position: relative;
+  width: 100%;
+  height: 100vh;
+  min-width: 1200px;
+  min-height: 700px;
+  overflow: hidden;
+  background: var(--dw-bg);
+}
+
+.dw-main {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background: var(--dw-bg);
+}
+
+.dw-header {
+  position: relative;
+  width: calc(100% - 80px);
+  max-width: 1160px;
+  margin: 30px auto 0;
+  padding: 40px;
+  border-radius: var(--dw-radius-lg);
+  background: var(--dw-panel);
+  box-shadow: var(--dw-shadow);
+  animation: dw-appear 280ms ease-out both;
+}
+
+.dw-title-text {
+  color: var(--dw-text);
+  font-size: 24px;
+  line-height: 1.2;
+  font-weight: 800;
+  font-style: italic;
+  text-align: center;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.65);
+}
+
+.dw-root.dark .dw-title-text {
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+}
+
+.dw-search {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  width: fit-content;
+  height: fit-content;
+  transform: translateY(-50%);
+}
+
+.dw-search-input {
+  width: 0;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  border-radius: 999px;
+  color: #312e81;
+  background: var(--dw-control);
+  box-shadow: var(--dw-shadow-inset);
+  font-size: 14px;
+  font-weight: 600;
+  pointer-events: none;
+  transition: width var(--dw-transition), padding var(--dw-transition), opacity var(--dw-transition);
+  opacity: 0;
+}
+
+.dw-search-input.is-open {
+  width: 184px;
+  padding: 0 34px 0 16px;
+  pointer-events: auto;
+  opacity: 1;
+}
+
+.dw-search-input::placeholder {
+  color: rgba(79, 70, 229, 0.72);
+}
+
+.dw-root.dark .dw-search-input {
+  color: #111827;
+}
+
+.dw-icon-button,
+.dw-theme-toggle {
+  appearance: none;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  cursor: pointer;
+  transition: transform var(--dw-transition), filter var(--dw-transition), opacity var(--dw-transition), left var(--dw-transition);
+}
+
+.dw-icon-button:active,
+.dw-theme-toggle:active span {
+  transform: scale(0.92);
+}
+
+.dw-search-button {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: var(--dw-control-soft);
+  box-shadow: var(--dw-shadow-soft);
+}
+
+.dw-search-button:hover,
+.dw-icon-button:hover {
+  filter: brightness(1.06);
+}
+
+.dw-search-button span,
+.dw-search-button span::before,
+.dw-search-button span::after,
+.dw-close-button span,
+.dw-close-button span::before,
+.dw-close-button span::after {
+  position: absolute;
+  display: block;
+  content: "";
+}
+
+.dw-search-button span {
+  inset: 0;
+}
+
+.dw-search-button span::before {
+  left: 5px;
+  top: 5px;
+  width: 11px;
+  height: 11px;
+  border: 2px solid var(--dw-text-soft);
+  border-radius: 999px;
+}
+
+.dw-search-button span::after {
+  left: 15px;
+  top: 15px;
+  width: 3px;
+  height: 9px;
+  border-radius: 999px;
+  background: var(--dw-text-soft);
+  transform: rotate(-45deg);
+}
+
+.dw-search-button.is-open span::before,
+.dw-search-button.is-open span::after,
+.dw-close-button span::before,
+.dw-close-button span::after {
+  left: 50%;
+  top: 50%;
+  width: 3px;
+  height: 16px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--dw-text-soft);
+  transform-origin: center;
+}
+
+.dw-search-button.is-open span::before,
+.dw-close-button span::before {
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.dw-search-button.is-open span::after,
+.dw-close-button span::after {
+  transform: translate(-50%, -50%) rotate(-45deg);
+}
+
+.dw-search-button.has-value span::before,
+.dw-search-button.has-value span::after,
+.dw-close-button:hover span::before,
+.dw-close-button:hover span::after {
+  background: #ef4444;
+}
+
+.dw-theme-toggle {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  width: 62px;
+  height: 32px;
+  transform: translateY(-50%);
+  border-radius: 999px;
+  background: var(--dw-control);
+  box-shadow: var(--dw-shadow-inset);
+}
+
+.dw-theme-toggle span {
+  position: absolute;
+  left: 3px;
+  top: 3px;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: var(--dw-control-soft);
+  box-shadow: var(--dw-shadow-soft);
+  transition: left var(--dw-transition), background var(--dw-transition), transform var(--dw-transition);
+}
+
+.dw-theme-toggle.is-dark span {
+  left: 32px;
+}
+
+.dw-grid-frame {
+  width: calc(100% - 20px);
+  height: calc(100vh - 112px);
+  margin: 0 auto;
+}
+
+.dw-scroll {
+  color: var(--dw-text);
+}
+
+.dw-demo-card {
+  position: relative;
+  width: 238px;
+  height: 156px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--dw-radius-lg);
+  color: var(--dw-text);
+  background: var(--dw-card);
+  box-shadow: var(--dw-shadow-soft);
+  animation: dw-ident 220ms ease-out both;
+  transition: transform var(--dw-transition), box-shadow var(--dw-transition), background var(--dw-transition), filter var(--dw-transition);
+}
+
+.dw-demo-card:hover {
+  background: var(--dw-card-hover);
+  box-shadow: var(--dw-shadow);
+}
+
+.dw-demo-card:active {
+  transform: scale(0.96);
+}
+
+.dw-demo-card--not-found {
+  position: absolute;
+  left: calc(50% - 119px);
+  top: calc(50% - 77px);
+  transform: rotate(6deg);
+}
+
+.dw-demo-preview {
+  position: absolute;
+  width: 1200px;
+  height: 640px;
+  overflow: hidden;
+  pointer-events: none;
+  border-radius: 50px;
+  background: #fff;
+  box-shadow: 0 10px 24px rgba(49, 46, 129, 0.2);
+  transform: translateY(10px) scale(0.180134);
+}
+
+.dw-root.dark .dw-demo-preview {
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5);
+}
+
+.dw-demo-label {
+  position: absolute;
+  inset: 0;
+  display: block;
+  padding: 0 25px;
+  color: inherit;
+  font-size: 12px;
+  line-height: 28px;
+  font-weight: 800;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-decoration: none;
+  cursor: pointer;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+
+.dw-root.dark .dw-demo-label {
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+}
+
+.dw-info-badge {
+  position: absolute;
+  left: 214px;
+  top: 6px;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  color: var(--dw-text);
+  background: var(--dw-control-soft);
+  box-shadow: var(--dw-shadow-soft);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 900;
+  cursor: help;
+  transition: background var(--dw-transition), color var(--dw-transition), filter var(--dw-transition);
+}
+
+.dw-info-badge:hover {
+  filter: brightness(1.08);
+}
+
+.dw-info-badge.is-disabled {
+  pointer-events: none;
+}
+
+.dw-demo-modal {
+  position: fixed;
+  width: 1200px;
+  height: 640px;
+  overflow: hidden;
+  border-radius: 50px;
+  background: #fff;
+  box-shadow: 0 10px 24px rgba(49, 46, 129, 0.2);
+  transform: scale(0.180134);
+  transition: inset var(--dw-transition), top var(--dw-transition), left var(--dw-transition), width var(--dw-transition), height var(--dw-transition), transform var(--dw-transition), border-radius var(--dw-transition), background var(--dw-transition);
+  transform-origin: left top;
+}
+
+.dw-demo-modal.is-open {
+  inset: 0 auto auto 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+  background: var(--dw-modal-bg);
+  transform: scale(1);
+}
+
+.dw-loading-fill {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(4, 8, 42, 0.4);
+}
+
+.dw-close-button,
+.dw-to-top {
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  background: var(--dw-control-soft);
+  box-shadow: var(--dw-shadow-soft);
+  z-index: 10;
+}
+
+.dw-close-button {
+  left: 50%;
+  bottom: 30px;
+  transform: translateX(-50%);
+}
+
+.dw-to-top {
+  right: 30px;
+  bottom: 30px;
+  opacity: 0;
+  transform: scale(0.9);
+  pointer-events: none;
+}
+
+.dw-to-top.is-visible {
+  opacity: 1;
+  transform: scale(1);
+  pointer-events: auto;
+}
+
+.dw-to-top span,
+.dw-to-top span::before,
+.dw-to-top span::after {
+  position: absolute;
+  display: block;
+  content: "";
+}
+
+.dw-to-top span {
+  left: 50%;
+  top: 50%;
+  width: 26px;
+  height: 26px;
+  transform: translate(-50%, -50%);
+}
+
+.dw-to-top span::before,
+.dw-to-top span::after {
+  top: 10px;
+  width: 16px;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--dw-text-soft);
+}
+
+.dw-to-top span::before {
+  left: 0;
+  transform: rotate(-45deg);
+}
+
+.dw-to-top span::after {
+  right: 0;
+  transform: rotate(45deg);
+}
+
+.dw-not-found-content {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 72px;
+  font-weight: 900;
+  color: var(--dw-text);
+}
+
+@keyframes dw-appear {
+  from {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes dw-ident {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}

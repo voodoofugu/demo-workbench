@@ -1,0 +1,56 @@
+{
+  "name": "demo-workbench",
+  "version": "0.1.0",
+  "description": "React demo workbench for browsing and opening project demos/screens.",
+  "author": "Georg Schilin",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/voodoofugu/demo-workbench.git"
+  },
+  "bugs": {
+    "url": "https://github.com/voodoofugu/demo-workbench/issues"
+  },
+  "homepage": "https://github.com/voodoofugu/demo-workbench#readme",
+  "type": "module",
+  "sideEffects": [
+    "./dist/styles.css"
+  ],
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./styles.css": "./dist/styles.css"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format esm,cjs --dts --clean && cp src/styles.css dist/styles.css",
+    "typecheck": "tsc --noEmit",
+    "pack:dry": "npm pack --dry-run"
+  },
+  "dependencies": {
+    "morphing-scroll": "^2.9.0",
+    "nexus-state": "^3.1.0",
+    "styled-atom": "^2.1.1"
+  },
+  "peerDependencies": {
+    "react": ">=18 <20",
+    "react-dom": ">=18 <20"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.4",
+    "@types/react-dom": "^19.0.2",
+    "tsup": "^8.5.0",
+    "typescript": "^5.3.3",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  }
+}
