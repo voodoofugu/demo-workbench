@@ -36,7 +36,7 @@
   ],
   "scripts": {
     "prepare": "npm run build",
-    "build": "tsup src/index.ts --format esm,cjs --dts --clean && cp src/styles/workbench.css dist/styles.css",
+    "build": "tsup src/index.ts --format esm,cjs --dts --clean --inject-style && cp src/styles/workbench.css dist/styles.css",
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm run build && npm run pack:dry",
     "pack:dry": "npm pack --dry-run",

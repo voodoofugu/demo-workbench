@@ -34,8 +34,9 @@ npm install demo-workbench
 
 ```jsx
 import DemoWorkbench from "demo-workbench";
-import "demo-workbench/styles.css";
 ```
+
+Workbench shell styles are injected by the package automatically when `DemoWorkbench` is imported.
 
 For local sibling-project development:
 
@@ -51,7 +52,7 @@ For local sibling-project development:
 >
 > - Supports both **ESM** (`import`) and **CommonJS** (`require`) builds.
 > - Written with React and ships TypeScript declaration files.
-> - The package owns the reusable shell styles through `demo-workbench/styles.css`.
+> - The package injects reusable shell styles automatically from its main JS bundle.
 > - Project/demo CSS is still loaded by the consuming project through `cssLoader`.
 > - React and React DOM are peer dependencies, so the host app keeps one React instance.
 
@@ -69,7 +70,6 @@ For local sibling-project development:
 
 ```jsx
 import DemoWorkbench from "demo-workbench";
-import "demo-workbench/styles.css";
 
 import demos from "./demoManifest";
 
