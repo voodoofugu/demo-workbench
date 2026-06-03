@@ -14,6 +14,7 @@
   "homepage": "https://github.com/voodoofugu/demo-workbench#readme",
   "type": "module",
   "sideEffects": [
+    "./src/styles/workbench.css",
     "./dist/styles.css"
   ],
   "main": "./dist/index.cjs",
@@ -25,10 +26,11 @@
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     },
-    "./styles.css": "./dist/styles.css"
+    "./styles.css": "./src/styles/workbench.css"
   },
   "files": [
     "dist",
+    "src/styles/workbench.css",
     "README.md",
     "LICENSE"
   ],

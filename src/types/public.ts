@@ -1,47 +1,111 @@
 import type { ComponentType, ReactNode } from "react";
 
+/**
+ * Module shape returned by a demo loader.
+ *
+ * A demo module must expose a default React component. Optional `css` / `cssFiles`
+ * arrays are forwarded to `styled-atom` before the preview is rendered.
+ */
 export type DemoModule = {
+  /** Demo component rendered inside the workbench cell and modal. */
   default: ComponentType<{ pageName?: string; children?: ReactNode }>;
+  /** Legacy styled-atom CSS file names used by the demo. */
   css?: string[];
+  /** Preferred styled-atom CSS file names used by the demo. */
   cssFiles?: string[];
 };
 
+/**
+ * One item in the workbench grid.
+ *
+ * `name` is used for labels, search, hash state, storage keys and the `pageName`
+ * prop passed to the loaded component. Keep it stable between sessions.
+ */
 export type DemoItem = {
+  /** Stable visible name of the demo. */
   name: string;
+  /** Lazy loader for the demo module. Usually `() => import("./MyDemo")`. */
   load: () => Promise<DemoModule>;
+  /** Legacy styled-atom CSS file names loaded for this demo preview. */
   css?: string[];
+  /** Preferred styled-atom CSS file names loaded for this demo preview. */
   cssFiles?: string[];
 };
 
+/**
+ * Base viewport used to scale an opened demo when the shell is resized.
+ */
 export type DemoWorkbenchViewport = {
+  /** Design-time width of the demo surface. */
   width: number;
+  /** Design-time height of the demo surface. */
   height: number;
 };
 
+/**
+ * Initial persisted workbench state.
+ *
+ * Pass this when the host app wants to restore or override state before browser
+ * storage is read by the shell.
+ */
 export type DemoWorkbenchInitialState = {
+  /** Whether the shell starts in dark theme mode. */
   darkTheme?: boolean;
+  /** Initial search input value. */
   searchText?: string;
+  /** Initial filtered demo names, or `null` to show all demos. */
   searchData?: string[] | null;
+  /** Name of the initially opened demo page. */
   activePage?: string;
+  /** Saved modal/scroll position data. */
   pageData?: {
     scrollTop?: number | string;
     top?: number | string;
     left?: number | string;
   } | null;
+  /** Host-defined popup state persisted by the workbench. */
   popupState?: unknown;
+  /** Initial resize scale for opened demo content. */
   windowScale?: number;
 };
 
+/** Storage target for a persisted workbench field. */
+export type DemoWorkbenchStorageKind = "local" | "session" | undefined;
+
+/**
+ * Storage entry consumed by the workbench storage bridge.
+ *
+ * The first tuple item is the state field name. The optional second item chooses
+ * `localStorage`; omitted/`undefined` uses `sessionStorage`.
+ */
+export type DemoWorkbenchStorageEntry = [string, DemoWorkbenchStorageKind?];
+
+/**
+ * Props for the DemoWorkbench React shell.
+ *
+ * Minimal setup is just a title and a lazy demo manifest. The host project keeps
+ * ownership of actual demo components, CSS imports and optional content rendered
+ * inside opened demos.
+ */
 export type DemoWorkbenchProps = {
+  /** Shell title shown in the workbench header and document title. */
   title?: string;
+  /** Demo manifest rendered as searchable cards. */
   demos?: DemoItem[];
+  /** Dynamic CSS loader used by `styled-atom`, e.g. `(name) => import(...)`. */
   cssLoader?: (name: string) => Promise<unknown>;
+  /** Global styled-atom CSS files loaded before the shell renders. */
   baseCssFiles?: string[];
+  /** Extra styled-atom CSS files for the workbench shell itself. */
   shellCssFiles?: string[];
-  storageData?: Array<[string, "local" | "session" | undefined]>;
+  /** Storage fields that should be persisted between reloads. */
+  storageData?: DemoWorkbenchStorageEntry[];
+  /** Base viewport used for modal scaling. */
   viewport?: DemoWorkbenchViewport;
+  /** State applied before storage restoration. */
   initialState?: DemoWorkbenchInitialState;
+  /** Optional host content rendered as children of an opened demo component. */
   renderDemoContent?: (pageName: string) => ReactNode;
-  renderSvgDefs?: () => ReactNode;
+  /** Component rendered when search/hash points to a missing demo. */
   notFoundComponent?: ComponentType;
 };

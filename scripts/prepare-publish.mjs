@@ -4,6 +4,7 @@ import path from "node:path";
 const root = process.cwd();
 const publishDir = path.join(root, "publish");
 const publishDist = path.join(publishDir, "dist");
+const publishStyles = path.join(publishDir, "src", "styles");
 
 const rootPackage = JSON.parse(
   await readFile(path.join(root, "package.json"), "utf8"),
@@ -27,13 +28,18 @@ const publishPackage = {
   sideEffects: rootPackage.sideEffects,
   dependencies: rootPackage.dependencies,
   peerDependencies: rootPackage.peerDependencies,
-  files: ["dist", "README.md", "LICENSE"],
+  files: rootPackage.files,
 };
 
 await rm(publishDir, { recursive: true, force: true });
 await mkdir(publishDir, { recursive: true });
+await mkdir(publishStyles, { recursive: true });
 
 await cp(path.join(root, "dist"), publishDist, { recursive: true });
+await cp(
+  path.join(root, "src", "styles", "workbench.css"),
+  path.join(publishStyles, "workbench.css"),
+);
 await cp(path.join(root, "README.md"), path.join(publishDir, "README.md"));
 await cp(path.join(root, "LICENSE"), path.join(publishDir, "LICENSE"));
 

@@ -89,19 +89,29 @@ Renders the full workbench shell: header, search, theme toggle, scrollable demo 
 The consuming project passes demo entries and optional render hooks, while the package keeps the reusable layout and shell styling in one place.
 </em><br />
 
+<b>Signature:</b><br />
+
+```ts
+function DemoWorkbench(props: DemoWorkbenchProps): JSX.Element;
+```
+
 <b>Props:</b><br />
 
-- `title` - workbench title and default document title.
-- `demos` - list of demo entries.
-- `cssLoader` - async project CSS loader used by `styled-atom`.
-- `baseCssFiles` - project base CSS atoms, defaults to `["output"]`.
-- `shellCssFiles` - optional extra shell CSS atoms from the host project.
-- `storageData` - persisted state keys and storage type.
-- `viewport` - default preview viewport used for scale calculations.
-- `initialState` - initial workbench state.
-- `renderDemoContent` - optional content rendered inside opened demos.
-- `renderSvgDefs` - optional SVG defs/filters rendered before the shell.
-- `notFoundComponent` - fallback component for unknown demo pages.
+- `title?: string` - workbench title and default document title.
+- `demos?: DemoItem[]` - searchable demo manifest.
+- `cssLoader?: (name: string) => Promise<unknown>` - async project CSS loader used by `styled-atom`.
+- `baseCssFiles?: string[]` - project base CSS atoms, defaults to `["output"]`.
+- `shellCssFiles?: string[]` - optional extra shell CSS atoms from the host project.
+- `storageData?: DemoWorkbenchStorageEntry[]` - persisted state keys and storage type.
+- `viewport?: { width: number; height: number }` - base preview viewport used for scale calculations.
+- `initialState?: DemoWorkbenchInitialState` - initial workbench state applied before storage restore.
+- `renderDemoContent?: (pageName: string) => ReactNode` - optional content rendered inside opened demos.
+- `notFoundComponent?: ComponentType` - fallback component for unknown demo pages.
+
+<b>Returns:</b><br />
+A React element containing the complete reusable workbench shell.
+
+Project-level SVG filters/defs should be rendered by the host app as normal siblings near `DemoWorkbench`, not through a workbench prop.
 
 </div></ul></details>
 
