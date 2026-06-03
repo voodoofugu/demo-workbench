@@ -29,12 +29,18 @@
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
-    "build": "tsup src/index.ts --format esm,cjs --dts --clean && cp src/styles.css dist/styles.css",
+    "build": "tsup src/index.ts --format esm,cjs --dts --clean && cp src/styles/workbench.css dist/styles.css",
     "typecheck": "tsc --noEmit",
-    "pack:dry": "npm pack --dry-run"
+    "check": "npm run typecheck && npm run build && npm run pack:dry",
+    "pack:dry": "npm pack --dry-run",
+    "package-prepare": "npm run build && node scripts/prepare-publish.mjs",
+    "publish:dry": "npm run package-prepare && npm publish ./publish --dry-run",
+    "publish": "npm run package-prepare && npm publish ./publish --access public",
+    "npm-login": "npm login"
   },
   "dependencies": {
     "morphing-scroll": "^2.9.0",
@@ -52,5 +58,15 @@
     "typescript": "^5.3.3",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
-  }
+  },
+  "keywords": [
+    "demo-workbench",
+    "react",
+    "demo",
+    "workbench",
+    "component-preview",
+    "ui-development",
+    "design-system",
+    "storybook-alternative"
+  ]
 }

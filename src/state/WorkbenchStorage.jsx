@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 
-import useStorageItems from "./useStorageItems";
+import useStorageItems from "../hooks/useStorageItems";
 import { useWorkbenchStore } from "./WorkbenchState";
 
 export default function WorkbenchStorage({ storageData = [] }) {

@@ -2,11 +2,11 @@ import { memo, useEffect, useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import { StyledAtom } from "styled-atom";
 
-import useDynamicModule from "./useDynamicModule";
-import { useWorkbenchActions, useWorkbenchValue } from "./WorkbenchState";
+import useDynamicModule from "../hooks/useDynamicModule";
+import { useWorkbenchActions, useWorkbenchValue } from "../state/WorkbenchState";
 
-import Loading from "./components/Loading";
-import PageCloseBtn from "./components/PageCloseBtn";
+import PageCloseBtn from "./buttons/PageCloseBtn";
+import Loading from "./feedback/Loading";
 
 const loadFill = <div className="dw-loading-fill" />;
 

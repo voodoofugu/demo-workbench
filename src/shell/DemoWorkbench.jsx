@@ -1,9 +1,9 @@
 import { StyleCore, StyledAtom } from "styled-atom";
 
-import WorkbenchStorage from "./WorkbenchStorage";
-import WorkbenchTitle from "./WorkbenchTitle";
+import WorkbenchStorage from "../state/WorkbenchStorage";
+import { WorkbenchStateProvider } from "../state/WorkbenchState";
 import WorkbenchShell from "./WorkbenchShell";
-import { WorkbenchStateProvider } from "./WorkbenchState";
+import WorkbenchTitle from "./WorkbenchTitle";
 
 const defaultStorageData = [
   ["darkTheme", "local"],

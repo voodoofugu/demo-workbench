@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 
-import { useWorkbenchValue } from "./WorkbenchState";
+import { useWorkbenchValue } from "../state/WorkbenchState";
 
 export default function WorkbenchTitle({ title = "Template" }) {
   const activePage = useWorkbenchValue("activePage");

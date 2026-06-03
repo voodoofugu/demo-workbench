@@ -1,9 +1,9 @@
 import { memo } from "react";
 import { ResizeTracker } from "morphing-scroll";
 
+import DemoGrid from "../components/DemoGrid";
+import { useWorkbenchActions } from "../state/WorkbenchState";
 import WorkbenchLayout from "./WorkbenchLayout";
-import DemoGrid from "./DemoGrid";
-import { useWorkbenchActions } from "./WorkbenchState";
 
 const defaultViewport = { width: 1200, height: 640 };
 

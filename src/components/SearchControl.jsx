@@ -7,7 +7,7 @@ import {
   useDeferredValue,
 } from "react";
 
-import { useWorkbenchActions, useWorkbenchValue } from "./WorkbenchState";
+import { useWorkbenchActions, useWorkbenchValue } from "../state/WorkbenchState";
 
 export default function SearchControl({ demos = [] }) {
   const searchText = useWorkbenchValue("searchText") || "";

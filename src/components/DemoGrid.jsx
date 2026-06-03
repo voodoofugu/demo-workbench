@@ -2,9 +2,9 @@ import { useMemo, useState, useLayoutEffect } from "react";
 import { MorphScroll } from "morphing-scroll";
 
 import DemoCell from "./DemoCell";
-import ToTopButton from "./components/ToTopButton";
-import useStorageItems from "./useStorageItems";
-import { useWorkbenchValue } from "./WorkbenchState";
+import ToTopButton from "./buttons/ToTopButton";
+import useStorageItems from "../hooks/useStorageItems";
+import { useWorkbenchValue } from "../state/WorkbenchState";
 
 function DefaultNotFoundComponent() {
   return <div className="dw-not-found-content">404</div>;

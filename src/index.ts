@@ -1,9 +1,9 @@
-export { default as DemoWorkbench } from "./DemoWorkbench";
-export { default } from "./DemoWorkbench";
+export { default as DemoWorkbench } from "./shell/DemoWorkbench";
+export { default } from "./shell/DemoWorkbench";
 export type {
   DemoItem,
   DemoModule,
   DemoWorkbenchInitialState,
   DemoWorkbenchProps,
   DemoWorkbenchViewport,
-} from "./types";
+} from "./types/public";

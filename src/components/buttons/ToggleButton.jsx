@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 
-import { useWorkbenchActions, useWorkbenchValue } from "../WorkbenchState";
+import { useWorkbenchActions, useWorkbenchValue } from "../../state/WorkbenchState";
 
 export default function ToggleButton() {
   const theme = useWorkbenchValue("darkTheme");

@@ -1,7 +1,7 @@
 import { memo } from "react";
 
-import SearchControl from "./SearchControl";
-import ToggleButton from "./components/ToggleButton";
+import SearchControl from "../components/SearchControl";
+import ToggleButton from "../components/buttons/ToggleButton";
 
 export default memo(function WorkbenchLayout({ title, demos, children }) {
   return (
