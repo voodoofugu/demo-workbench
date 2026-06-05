@@ -44,34 +44,30 @@ function parseArgs(args: string[]): CliOptions {
   };
 }
 
-function printResult(result: WorkbenchCompileResult) {
-  if (!result.styles) return;
-  const files = result.styles.files.map((file) => file.outputFile).join(", ");
-  console.log(`demo-workbench styles: compiled ${result.styles.files.length} file(s)${files ? `: ${files}` : ""}`);
+function printRegistryResult(result: Pick<WorkbenchCompileResult, "demos" | "popups">) {
+  if (!result.demos && !result.popups) return;
 
-  if (result.fileRegistry) {
-    const target = result.fileRegistry.outputFiles.length
-      ? result.fileRegistry.outputFiles.join(", ")
-      : "internal registry";
-    console.log(
-      `demo-workbench registry: stored ${result.fileRegistry.demos.length} demo(s), ${result.fileRegistry.popups.length} popup name(s): ${target}`,
-    );
+  const outputFiles = result.demos?.outputFiles ?? result.popups?.outputFiles ?? [];
+  const target = outputFiles.length ? outputFiles.join(", ") : "internal registry";
+  console.log(
+    `demo-workbench registry: stored ${result.demos?.names.length ?? 0} demo(s), ${result.popups?.names.length ?? 0} popup name(s): ${target}`,
+  );
+}
+
+function printResult(result: WorkbenchCompileResult) {
+  if (result.styles) {
+    const files = result.styles.files.map((file) => file.outputFile).join(", ");
+    console.log(`demo-workbench styles: compiled ${result.styles.files.length} file(s)${files ? `: ${files}` : ""}`);
   }
+
+  printRegistryResult(result);
 }
 
 async function build(options: CompileWorkbenchStylesOptions) {
   const result = await compileWorkbenchStyles(options);
   const files = result.files.map((file) => file.outputFile).join(", ");
   console.log(`demo-workbench styles: compiled ${result.files.length} file(s)${files ? `: ${files}` : ""}`);
-
-  if (result.fileRegistry) {
-    const target = result.fileRegistry.outputFiles.length
-      ? result.fileRegistry.outputFiles.join(", ")
-      : "internal registry";
-    console.log(
-      `demo-workbench registry: stored ${result.fileRegistry.demos.length} demo(s), ${result.fileRegistry.popups.length} popup name(s): ${target}`,
-    );
-  }
+  printRegistryResult(result);
 }
 
 async function main() {

@@ -156,10 +156,11 @@ test("DemoWorkbench synchronously restores activePage/pageData/scrollTop before 
   assert.match(storageState, /restoredState/);
 });
 
-test("DemoWorkbench exposes one host cssFiles list and keeps cssFiles as compatibility alias", async () => {
-  const [publicTypes, demoWorkbench] = await Promise.all([
+test("DemoWorkbench exposes one stable host cssFiles list and keeps cssFiles as compatibility alias", async () => {
+  const [publicTypes, demoWorkbench, demoCell] = await Promise.all([
     readFile(path.join(root, "src/types/public.ts"), "utf8"),
     readFile(path.join(root, "src/shell/DemoWorkbench.tsx"), "utf8"),
+    readFile(path.join(root, "src/components/DemoCell.tsx"), "utf8"),
   ]);
 
   assert.match(publicTypes, /cssFiles\?:\s*string\[\]/);
@@ -170,12 +171,13 @@ test("DemoWorkbench exposes one host cssFiles list and keeps cssFiles as compati
   assert.doesNotMatch(publicTypes, /shellCssFiles/);
   assert.match(
     demoWorkbench,
-    /hostCssFiles = cssFiles \?\? cssFiles \?\? \["output"\]/,
+    /rawHostCssFiles = cssFiles \?\? baseCssFiles \?\? \["output"\]/,
   );
-  assert.match(
-    demoWorkbench,
-    /orderedCssFiles = \[WORKBENCH_STYLE_ATOM, \.\.\.hostCssFiles\]/,
-  );
+  assert.match(demoWorkbench, /hostCssFiles = useStableStringList\(rawHostCssFiles\)/);
+  assert.match(demoWorkbench, /orderedCssFiles = useStableStringList\(/);
+  assert.match(demoWorkbench, /styleLoaderRef/);
+  assert.match(demoCell, /stableCssFiles = useStableStringList\(cssFiles\)/);
+  assert.doesNotMatch(demoCell, /\.\.\.baseCssFiles/);
   assert.doesNotMatch(demoWorkbench, /shellCssFiles/);
 });
 

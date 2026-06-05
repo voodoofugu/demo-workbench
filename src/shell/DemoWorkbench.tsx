@@ -1,16 +1,16 @@
 import type { ComponentType } from "react";
-import { useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { StyleCore, StyledAtom } from "styled-atom";
 
 import workbenchCss from "../styles/workbenchCss";
 import RawWorkbenchStorage from "../state/WorkbenchStorage";
 import generatedWorkbenchRegistry from "../state/generatedWorkbenchRegistry";
 import { WorkbenchStateProvider } from "../state/WorkbenchState";
+import { useStableStringList } from "../utils/useStableStringList";
 import { getHashWorkbenchState } from "../utils/workbenchPosition";
 import { readStoredWorkbenchState } from "../utils/workbenchStorageState";
 import RawWorkbenchShell from "./WorkbenchShell";
 import WorkbenchTitle from "./WorkbenchTitle";
-import workbenchNexus from "../state/workbenchNexus";
 
 import type {
   DemoWorkbenchInitialState,
@@ -53,6 +53,10 @@ const defaultStorageData: DemoWorkbenchStorageEntry[] = [
 const defaultViewport: DemoWorkbenchViewport = { width: 1200, height: 640 };
 const emptyCssLoader = () => Promise.resolve();
 
+function WorkbenchGlobalStyles({ fileNames }: { fileNames: string[] }) {
+  return <StyledAtom fileNames={fileNames} />;
+}
+
 /**
  * Searchable React shell for local component/demo development.
  *
@@ -64,6 +68,7 @@ export default function DemoWorkbench({
   demos,
   demoLoader,
   styleLoader,
+  cssFiles,
   baseCssFiles,
   storageData = defaultStorageData,
   viewport = defaultViewport,
@@ -75,17 +80,26 @@ export default function DemoWorkbench({
 }: DemoWorkbenchProps) {
   const resolvedStyleLoader: (name: string) => Promise<unknown> =
     styleLoader ?? emptyCssLoader;
+  const styleLoaderRef = useRef(resolvedStyleLoader);
 
-  const loadStyle = (fileName: string) => {
+  useEffect(() => {
+    styleLoaderRef.current = resolvedStyleLoader;
+  }, [resolvedStyleLoader]);
+
+  const loadStyle = useCallback((fileName: string) => {
     if (fileName === WORKBENCH_STYLE_ATOM) {
       return Promise.resolve({ default: workbenchCss });
     }
 
-    return resolvedStyleLoader(fileName);
-  };
+    return styleLoaderRef.current(fileName);
+  }, []);
 
-  // Host-level base CSS is merged into every demo preview by DemoCell.
-  workbenchNexus.set({ baseCssFiles: baseCssFiles ?? [] });
+  const rawHostCssFiles = cssFiles ?? baseCssFiles ?? ["output"];
+  const hostCssFiles = useStableStringList(rawHostCssFiles);
+  const orderedCssFiles = useStableStringList([
+    WORKBENCH_STYLE_ATOM,
+    ...hostCssFiles,
+  ]);
 
   const registryDemos = useMemo(
     () =>
@@ -130,7 +144,7 @@ export default function DemoWorkbench({
   return (
     <WorkbenchStateProvider initialState={restoredInitialState}>
       <TypedStyleCore path={loadStyle} />
-      <StyledAtom fileNames={[WORKBENCH_STYLE_ATOM]} />
+      <WorkbenchGlobalStyles fileNames={orderedCssFiles} />
       <WorkbenchTitle title={title} />
       <TypedWorkbenchStorage storageData={storageData} />
       <TypedWorkbenchShell

@@ -9,7 +9,10 @@ import type { ComponentType, ReactNode } from "react";
 export type DemoModule = {
   /** Demo component rendered inside the workbench cell and modal. */
   default: ComponentType<{ pageName?: string; children?: ReactNode }>;
-  /** Legacy styled-atom CSS file names used by the demo. */
+  /**
+   * Legacy styled-atom CSS file names used by the demo.
+   * @deprecated Use `cssFiles`.
+   */
   css?: string[];
   /** Preferred styled-atom CSS file names used by the demo. */
   cssFiles?: string[];
@@ -28,7 +31,10 @@ export type DemoItem = {
   title?: string;
   /** Lazy loader for the demo module. Usually `() => import("./MyDemo")`. */
   load: () => Promise<DemoModule>;
-  /** Legacy styled-atom CSS file names loaded for this demo preview. */
+  /**
+   * Legacy styled-atom CSS file names loaded for this demo preview.
+   * @deprecated Use `cssFiles`.
+   */
   css?: string[];
   /** Preferred styled-atom CSS file names loaded for this demo preview. */
   cssFiles?: string[];
@@ -103,7 +109,12 @@ export type DemoWorkbenchProps = {
   demoLoader?: DemoWorkbenchDemoLoader;
   /** Dynamic style loader used by `styled-atom`, e.g. `(name) => import(...)`. */
   styleLoader?: (name: string) => Promise<unknown>;
-  /** Base styled-atom CSS files added to every demo preview after the bundled workbench CSS. */
+  /** Host-level styled-atom CSS files loaded by the workbench shell and added to every demo preview. */
+  cssFiles?: string[];
+  /**
+   * Base styled-atom CSS files added to every demo preview.
+   * @deprecated Use `cssFiles`.
+   */
   baseCssFiles?: string[];
   /** Storage fields that should be persisted between reloads. */
   storageData?: DemoWorkbenchStorageEntry[];

@@ -5,11 +5,11 @@ import useDynamicModule from "../hooks/useDynamicModule";
 import { useWorkbenchStore } from "../state/WorkbenchState";
 import { parseBodySelectorReplacement } from "../utils/bodySelector";
 import { normalizeModuleCssFiles } from "../utils/demoCss";
+import { useStableStringList } from "../utils/useStableStringList";
 import { getElementPositionData } from "../utils/workbenchPosition";
 import PageCloseBtn from "./buttons/PageCloseBtn";
 import Loading from "./feedback/Loading";
 import Tooltip from "./Tooltip";
-import workbenchNexus from "../state/workbenchNexus";
 
 import type { ComponentType, MouseEvent, ReactNode } from "react";
 import type { DemoItem, DemoModule } from "../types/public";
@@ -131,11 +131,11 @@ const DemoCell = memo(function DemoCell({
   ) as DemoModule | null;
   const DynamicComponent = demo.Component ?? loadedModule?.default;
 
-  const baseCssFiles = workbenchNexus.get("baseCssFiles");
   const cssFiles = useMemo(
     () => normalizeModuleCssFiles(demo, loadedModule),
     [demo, loadedModule],
   );
+  const stableCssFiles = useStableStringList(cssFiles);
   const [newTabPosition, setNewTabPosition] = useState({
     scrollTop: 0,
     top: 0,
@@ -191,16 +191,16 @@ const DemoCell = memo(function DemoCell({
     />
   );
 
-  const content = cssFiles.length ? (
-    <StyledAtom
-      fileNames={[...cssFiles, ...baseCssFiles]}
-      fallback={<Loading />}
-      encap
-    >
-      {body}
-    </StyledAtom>
-  ) : (
-    body
+  const content = useMemo(
+    () =>
+      stableCssFiles.length ? (
+        <StyledAtom fileNames={stableCssFiles} fallback={<Loading />} encap>
+          {body}
+        </StyledAtom>
+      ) : (
+        body
+      ),
+    [stableCssFiles.toString(), body],
   );
 
   if (mode === "page") {
