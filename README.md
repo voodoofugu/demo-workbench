@@ -53,7 +53,7 @@ For local sibling-project development:
 > - Supports both **ESM** (`import`) and **CommonJS** (`require`) builds.
 > - Written with React and ships TypeScript declaration files.
 > - The package injects reusable shell styles automatically from its main JS bundle.
-> - Project/demo CSS is still loaded by the consuming project through `cssLoader`.
+> - Project/demo CSS is still loaded by the consuming project through `styleLoader`.
 > - React and React DOM are peer dependencies, so the host app keeps one React instance.
 
 <h2></h2>
@@ -78,7 +78,7 @@ export default function App() {
     <DemoWorkbench
       title="My Project Demos"
       demos={demos}
-      cssLoader={(name) => import(`../css/${name}.css`)}
+      styleLoader={(name) => import(`../css/${name}.css`)}
     />
   );
 }
@@ -98,10 +98,10 @@ function DemoWorkbench(props: DemoWorkbenchProps): JSX.Element;
 <b>Props:</b><br />
 
 - `title?: string` - workbench title and default document title.
-- `demos?: DemoItem[]` - searchable demo manifest.
-- `cssLoader?: (name: string) => Promise<unknown>` - async project CSS loader used by `styled-atom`.
-- `baseCssFiles?: string[]` - project base CSS atoms, defaults to `["output"]`.
-- `shellCssFiles?: string[]` - optional extra shell CSS atoms from the host project.
+- `demos?: DemoItem[]` - searchable demo manifest. If omitted, generated registry names are loaded through `demoLoader`.
+- `demoLoader?: (name: string) => Promise<DemoModule>` - async loader for generated demo names.
+- `styleLoader?: (name: string) => Promise<unknown>` - async project CSS loader used by `styled-atom`.
+- `baseCssFiles?: string[]` - project base CSS atoms added to every demo preview.
 - `storageData?: DemoWorkbenchStorageEntry[]` - persisted state keys and storage type.
 - `viewport?: { width: number; height: number }` - base preview viewport used for scale calculations.
 - `initialState?: DemoWorkbenchInitialState` - initial workbench state applied before storage restore.
@@ -187,10 +187,35 @@ npm run build
 ```jsx
 <DemoWorkbench
   demos={demos}
-  cssLoader={(name) => import(`../styles/${name}.css`)}
+  styleLoader={(name) => import(`../styles/${name}.css`)}
   baseCssFiles={["output", "theme"]}
 />
 ```
+
+</details>
+
+<details><summary><b>SCSS/style compilation from a host project</b>: <em>keep watch orchestration inside demo-workbench</em></summary><br />
+
+```ts
+import { watchWorkbenchCompile, workbenchCompile } from "demo-workbench/node";
+
+const options = {
+  styles: {
+    inputDir: "titans_rc/styles/scss",
+    outputDir: "src/styles/css",
+    bodySelectorReplacement: ".likeBody",
+  },
+  demos: { inputDir: "src/components/pages" },
+};
+
+await workbenchCompile(options);
+await watchWorkbenchCompile({
+  ...options,
+  onBuild: (result) => console.log(result.styles?.files.length ?? 0),
+});
+```
+
+Host projects should pass their paths/options only; file watching, debouncing and rebuild calls are owned by `demo-workbench/node`.
 
 </details>
 
@@ -210,6 +235,14 @@ npm run build
 <h2></h2>
 
 ### Development
+
+To run the local example workbench in the browser:
+
+```bash
+npm run dev
+```
+
+Then open `http://127.0.0.1:5173/`. The dev app lives in `dev/main.tsx` and renders the example manifest from `examples/index.js`, so it is a quick place to adjust shell/components/styles and immediately see how the demo pages render.
 
 ```bash
 npm run typecheck

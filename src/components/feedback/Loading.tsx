@@ -108,12 +108,20 @@ const LoadCss = `
   }
 `;
 
-export default function Loading({ noBG, addStyle }) {
+import type { CSSProperties } from "react";
+
+export default function Loading({
+  noBG,
+  addStyle,
+}: {
+  noBG?: boolean;
+  addStyle?: CSSProperties;
+}) {
   return (
     <>
       <style>{LoadCss}</style>
       {!noBG && <div className="blurBg"></div>}
-      <div className="loader" style={addStyle ? addStyle : null}>
+      <div className="loader" style={addStyle ? addStyle : undefined}>
         <div className="inner one"></div>
         <div className="inner two"></div>
         <div className="inner three"></div>

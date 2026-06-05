@@ -1,6 +1,6 @@
 {
   "name": "demo-workbench",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "React demo workbench for browsing and opening project demos/screens.",
   "author": "Georg Schilin",
   "license": "MIT",
@@ -14,40 +14,60 @@
   "homepage": "https://github.com/voodoofugu/demo-workbench#readme",
   "type": "module",
   "sideEffects": [
-    "./src/styles/workbench.css",
     "./dist/styles.css"
   ],
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "typesVersions": {
+    "*": {
+      "node": [
+        "./dist/node/index.d.ts"
+      ],
+      "styles.css": [
+        "./dist/styles.css"
+      ]
+    }
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     },
-    "./styles.css": "./src/styles/workbench.css"
+    "./styles.css": "./dist/styles.css",
+    "./node": {
+      "types": "./dist/node/index.d.ts",
+      "import": "./dist/node/index.js",
+      "require": "./dist/node/index.cjs"
+    }
   },
   "files": [
     "dist",
-    "src/styles/workbench.css",
     "README.md",
     "LICENSE"
   ],
   "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "dev:open": "vite --host 127.0.0.1 --open",
     "prepare": "npm run build",
-    "build": "tsup src/index.ts --format esm,cjs --dts --clean --inject-style && cp src/styles/workbench.css dist/styles.css",
+    "build": "npm run build:styles && tsup src/index.ts src/node/index.ts src/node/cli.ts --format esm,cjs --dts --clean --shims && cp src/styles/workbench.css dist/styles.css",
     "typecheck": "tsc --noEmit",
-    "check": "npm run typecheck && npm run build && npm run pack:dry",
+    "check": "npm run typecheck && npm run build && npm test && npm run pack:dry",
     "pack:dry": "npm pack --dry-run",
     "package-prepare": "npm run build && node scripts/prepare-publish.mjs",
     "publish:dry": "npm run package-prepare && npm publish ./publish --dry-run",
     "publish": "npm run package-prepare && npm publish ./publish --access public",
-    "npm-login": "npm login"
+    "npm-login": "npm login",
+    "build:styles": "tailwindcss -c tailwind.config.cjs -i src/styles/workbench.input.css -o src/styles/workbench.css --minify && node scripts/write-workbench-css-module.mjs",
+    "test": "npm run package-prepare && node --test test/*.test.mjs"
   },
   "dependencies": {
+    "chokidar": "^5.0.0",
+    "lightningcss": "^1.32.0",
     "morphing-scroll": "^2.9.0",
     "nexus-state": "^3.1.0",
+    "sass-embedded": "^1.100.0",
     "styled-atom": "^2.1.1"
   },
   "peerDependencies": {
@@ -55,12 +75,18 @@
     "react-dom": ">=18 <20"
   },
   "devDependencies": {
+    "@types/node": "^25.9.1",
     "@types/react": "^19.0.4",
     "@types/react-dom": "^19.0.2",
+    "@vitejs/plugin-react": "^6.0.2",
+    "autoprefixer": "^10.5.0",
+    "postcss": "^8.5.15",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "tailwindcss": "^3.4.19",
     "tsup": "^8.5.0",
     "typescript": "^5.3.3",
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "vite": "^8.0.16"
   },
   "keywords": [
     "demo-workbench",
@@ -71,5 +97,8 @@
     "ui-development",
     "design-system",
     "storybook-alternative"
-  ]
+  ],
+  "bin": {
+    "demo-workbench-styles": "./dist/node/cli.js"
+  }
 }

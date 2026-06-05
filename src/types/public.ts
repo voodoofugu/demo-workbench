@@ -24,6 +24,8 @@ export type DemoModule = {
 export type DemoItem = {
   /** Stable visible name of the demo. */
   name: string;
+  /** Optional visible title used in tabs and labels. */
+  title?: string;
   /** Lazy loader for the demo module. Usually `() => import("./MyDemo")`. */
   load: () => Promise<DemoModule>;
   /** Legacy styled-atom CSS file names loaded for this demo preview. */
@@ -31,6 +33,9 @@ export type DemoItem = {
   /** Preferred styled-atom CSS file names loaded for this demo preview. */
   cssFiles?: string[];
 };
+
+/** Lazy loader used when demos are generated from the internal workbench registry. */
+export type DemoWorkbenchDemoLoader = (name: string) => Promise<DemoModule>;
 
 /**
  * Base viewport used to scale an opened demo when the shell is resized.
@@ -65,6 +70,8 @@ export type DemoWorkbenchInitialState = {
   } | null;
   /** Host-defined popup state persisted by the workbench. */
   popupState?: unknown;
+  /** Saved grid scroll position. */
+  scrollTop?: number | false;
   /** Initial resize scale for opened demo content. */
   windowScale?: number;
 };
@@ -90,14 +97,14 @@ export type DemoWorkbenchStorageEntry = [string, DemoWorkbenchStorageKind?];
 export type DemoWorkbenchProps = {
   /** Shell title shown in the workbench header and document title. */
   title?: string;
-  /** Demo manifest rendered as searchable cards. */
+  /** Demo manifest rendered as searchable cards. If omitted, generated registry + `demoLoader` are used. */
   demos?: DemoItem[];
-  /** Dynamic CSS loader used by `styled-atom`, e.g. `(name) => import(...)`. */
-  cssLoader?: (name: string) => Promise<unknown>;
-  /** Global styled-atom CSS files loaded before the shell renders. */
+  /** Loader for generated demo names stored in the internal workbench registry. */
+  demoLoader?: DemoWorkbenchDemoLoader;
+  /** Dynamic style loader used by `styled-atom`, e.g. `(name) => import(...)`. */
+  styleLoader?: (name: string) => Promise<unknown>;
+  /** Base styled-atom CSS files added to every demo preview after the bundled workbench CSS. */
   baseCssFiles?: string[];
-  /** Extra styled-atom CSS files for the workbench shell itself. */
-  shellCssFiles?: string[];
   /** Storage fields that should be persisted between reloads. */
   storageData?: DemoWorkbenchStorageEntry[];
   /** Base viewport used for modal scaling. */
@@ -106,6 +113,10 @@ export type DemoWorkbenchProps = {
   initialState?: DemoWorkbenchInitialState;
   /** Optional host content rendered as children of an opened demo component. */
   renderDemoContent?: (pageName: string) => ReactNode;
+  /** Optional inline background value for the opened demo body. Defaults to Tailwind `bg-white`. */
+  bodyBg?: string;
+  /** Optional simple replacement selector applied to each DemoBody root (`.class`, `#id`, `[data-x]`, `[data-x="value"]`). */
+  bodySelectorReplacement?: string;
   /** Component rendered when search/hash points to a missing demo. */
   notFoundComponent?: ComponentType;
 };

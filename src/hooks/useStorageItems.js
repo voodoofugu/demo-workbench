@@ -1,50 +1,72 @@
-import { useEffect, useRef } from "react";
+import { useLayoutEffect, useMemo } from "react";
 
-function getStorage(type) {
-  return type === "local" ? localStorage : sessionStorage;
-}
+import {
+  getBrowserStorage,
+  parseStoredValue,
+  shouldRemoveStoredValue,
+  stringifyStoredValue,
+} from "../utils/storage.js";
 
-function parseValue(value) {
-  if (value == null) return undefined;
+const hydratedStorageKeys = new WeakMap();
 
-  try {
-    return JSON.parse(value);
-  } catch {
-    return value;
-  }
-}
+export default function useStorageItems(storageData = [], store, hydrateInitial = true) {
+  const entries = useMemo(
+    () =>
+      storageData.map((item) => ({
+        name: item[0] ?? item.name,
+        type: item[1] ?? item.type ?? "session",
+      })),
+    [storageData],
+  );
+  const entriesKey = JSON.stringify(entries);
 
-function stringifyValue(value) {
-  return typeof value === "string" ? value : JSON.stringify(value);
-}
+  useLayoutEffect(() => {
+    if (!store) return;
+    const storageItems = entries.filter((item) => item.name);
+    if (!storageItems.length) return;
 
-export default function useStorageItems(items = []) {
-  const loadedRef = useRef(false);
+    let hydratedKeys = hydratedStorageKeys.get(store);
+    if (!hydratedKeys) {
+      hydratedKeys = new Set();
+      hydratedStorageKeys.set(store, hydratedKeys);
+    }
 
-  useEffect(() => {
-    if (loadedRef.current) return;
-    loadedRef.current = true;
+    if (hydrateInitial && !hydratedKeys.has(entriesKey)) {
+      const restoredState = {};
 
-    items.forEach((item) => {
-      const type = item.type || "session";
-      const value = parseValue(getStorage(type).getItem(item.name));
+      storageItems.forEach((item) => {
+        const type = item.type || "session";
+        const storage = getBrowserStorage(type);
+        const value = parseStoredValue(storage?.getItem(item.name) ?? null);
 
-      if (value !== undefined && item.onLoad) {
-        item.onLoad(value);
+        if (value !== undefined) {
+          restoredState[item.name] = value;
+        }
+      });
+
+      hydratedKeys.add(entriesKey);
+
+      if (Object.keys(restoredState).length) {
+        store.set(restoredState);
       }
-    });
-  }, []);
+    }
 
-  useEffect(() => {
-    items.forEach((item) => {
-      const type = item.type || "session";
+    const writeState = (state) => {
+      storageItems.forEach((item) => {
+        const type = item.type || "session";
+        const storage = getBrowserStorage(type);
+        if (!storage) return;
 
-      if (item.value === undefined || item.value === null || item.value === false) {
-        getStorage(type).removeItem(item.name);
-        return;
-      }
+        const value = state[item.name];
+        if (shouldRemoveStoredValue(value)) {
+          storage.removeItem(item.name);
+          return;
+        }
 
-      getStorage(type).setItem(item.name, stringifyValue(item.value));
-    });
-  }, [items]);
+        storage.setItem(item.name, stringifyStoredValue(value));
+      });
+    };
+
+    return store.subscribe(writeState, storageItems.map((item) => item.name));
+  }, [entriesKey, store, hydrateInitial]);
 }

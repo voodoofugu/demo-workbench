@@ -1,0 +1,10 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.templateScroll .ms-object-box {
+  opacity: var(--content-visibility);
+  transition: transform 0.2s ease-in-out;
+  filter: grayscale(calc(1 - var(--content-visibility)))
+    blur(calc((1 - var(--content-visibility)) * 2px));
+}

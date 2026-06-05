@@ -1,0 +1,16 @@
+@import "./shared.css";
+
+.demo-workbench-example--alpha {
+  min-height: 100%;
+  padding: 48px;
+  color: #1e1b4b;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(251, 191, 36, 0.42), transparent 28rem),
+    linear-gradient(135deg, #eef2ff 0%, #fdf2f8 100%);
+}
+
+.demo-workbench-example--alpha .demo-workbench-example__button {
+  color: #312e81;
+  background: #facc15;
+  box-shadow: 0 16px 40px rgba(129, 140, 248, 0.28);
+}

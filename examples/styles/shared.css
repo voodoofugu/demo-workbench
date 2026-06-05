@@ -1,0 +1,44 @@
+.demo-workbench-example {
+  box-sizing: border-box;
+  display: grid;
+  align-content: center;
+  gap: 18px;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+.demo-workbench-example__eyebrow {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  opacity: 0.72;
+}
+
+.demo-workbench-example__title {
+  max-width: 720px;
+  margin: 0;
+  font-size: clamp(40px, 8vw, 92px);
+  line-height: 0.92;
+}
+
+.demo-workbench-example__body {
+  display: grid;
+  max-width: 520px;
+  gap: 18px;
+  font-size: 18px;
+  line-height: 1.6;
+}
+
+.demo-workbench-example__body p {
+  margin: 0;
+}
+
+.demo-workbench-example__button {
+  width: max-content;
+  border: 0;
+  border-radius: 999px;
+  padding: 12px 18px;
+  font: inherit;
+  font-weight: 800;
+}

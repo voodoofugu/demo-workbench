@@ -1,0 +1,80 @@
+import { memo, useEffect, useRef } from "react";
+import type { ComponentType } from "react";
+
+import {
+  useWorkbenchActions,
+  useWorkbenchValue,
+} from "../state/WorkbenchState";
+import WorkbenchLayout from "./WorkbenchLayout";
+import DemoGrid from "../components/DemoGrid";
+import type {
+  DemoItem,
+  DemoWorkbenchProps,
+  DemoWorkbenchViewport,
+} from "../types/public";
+
+type WorkbenchShellProps = {
+  title?: string;
+  demos?: DemoItem[];
+  viewport: DemoWorkbenchViewport;
+  renderDemoContent?: DemoWorkbenchProps["renderDemoContent"];
+  bodyBg?: DemoWorkbenchProps["bodyBg"];
+  bodySelectorReplacement?: DemoWorkbenchProps["bodySelectorReplacement"];
+  notFoundComponent?: ComponentType | undefined;
+};
+
+export default memo(function WorkbenchShell({
+  title,
+  demos = [],
+  viewport,
+  renderDemoContent,
+  bodyBg,
+  bodySelectorReplacement,
+  notFoundComponent,
+}: WorkbenchShellProps) {
+  const setWorkbenchState = useWorkbenchActions();
+  const theme = useWorkbenchValue("darkTheme") as boolean;
+  const rootRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!rootRef.current || typeof ResizeObserver === "undefined") return;
+
+    const observer = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect;
+      const widthScale =
+        width < viewport.width
+          ? Number((width / viewport.width).toFixed(4))
+          : 0;
+      const heightScale =
+        height < viewport.height
+          ? Number((height / viewport.height).toFixed(4))
+          : 0;
+      const scales = [widthScale, heightScale].filter((value) => value > 0);
+
+      setWorkbenchState({
+        windowScale: scales.length > 0 ? Math.min(...scales) : 0,
+      });
+    });
+
+    observer.observe(rootRef.current);
+    return () => observer.disconnect();
+  }, [setWorkbenchState, viewport.height, viewport.width]);
+
+  return (
+    <div
+      ref={rootRef}
+      id="templateBody"
+      className={`absolute overflow-hidden${theme ? " dark" : ""}`}
+    >
+      <WorkbenchLayout title={title} demos={demos}>
+        <DemoGrid
+          demos={demos}
+          renderDemoContent={renderDemoContent as any}
+          bodyBg={bodyBg}
+          bodySelectorReplacement={bodySelectorReplacement}
+          notFoundComponent={notFoundComponent}
+        />
+      </WorkbenchLayout>
+    </div>
+  );
+});
