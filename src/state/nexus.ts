@@ -14,7 +14,6 @@ export type WorkbenchOpenedDemo = {
 
 export type WorkbenchFileRegistry = {
   demos: string[];
-  popups: string[];
 };
 
 export type WorkbenchState = {
@@ -22,7 +21,6 @@ export type WorkbenchState = {
   darkTheme: boolean;
   fileRegistry: WorkbenchFileRegistry;
   pageData: WorkbenchPageData;
-  popupState?: unknown;
   searchData: string[] | null;
   searchText: string;
   scrollTop: number | false;
@@ -34,7 +32,7 @@ export type WorkbenchStateUpdate =
   | Partial<WorkbenchState>
   | ((state: WorkbenchState) => Partial<WorkbenchState>);
 
-type WorkbenchNexus = {
+type nexus = {
   get(): WorkbenchState;
   get<Key extends keyof WorkbenchState>(key: Key): WorkbenchState[Key];
   use(): WorkbenchState;
@@ -46,16 +44,14 @@ type WorkbenchNexus = {
   ): () => void;
 };
 
-const workbenchNexus: WorkbenchNexus = createReactNexus<WorkbenchState>({
+const nexus: nexus = createReactNexus<WorkbenchState>({
   state: {
     activePage: "",
     darkTheme: false,
     fileRegistry: {
       demos: [],
-      popups: [],
     },
     pageData: null,
-    popupState: null,
     searchData: null,
     searchText: "",
     scrollTop: 0,
@@ -64,4 +60,4 @@ const workbenchNexus: WorkbenchNexus = createReactNexus<WorkbenchState>({
   },
 });
 
-export default workbenchNexus;
+export default nexus;

@@ -2,13 +2,13 @@ import { mkdir, readdir, writeFile } from "node:fs/promises";
 import type { Dirent } from "node:fs";
 import path from "node:path";
 
-export type WorkbenchEntryListOptions = {
+export type WorkbenchFileNameDiscoveryOptions = {
   inputDir: string;
   extensions?: string[];
   exclude?: string[];
 };
 
-export type GenerateNameListOptions = WorkbenchEntryListOptions & {
+export type GenerateNameListOptions = WorkbenchFileNameDiscoveryOptions & {
   outputFile: string;
   exportName?: string;
 };
@@ -19,7 +19,7 @@ export type GenerateNameListResult = {
   names: string[];
 };
 
-export type GenerateDemoManifestOptions = WorkbenchEntryListOptions & {
+export type GenerateDemoManifestOptions = WorkbenchFileNameDiscoveryOptions & {
   outputFile: string;
   importPathPrefix?: string;
 };
@@ -62,7 +62,7 @@ function isWorkbenchEntryFile(entry: Dirent, extensions: Set<string>, exclude: S
   return !exclude.has(name);
 }
 
-export async function findWorkbenchEntryNames(options: WorkbenchEntryListOptions) {
+export async function discoverWorkbenchFileNames(options: WorkbenchFileNameDiscoveryOptions) {
   const inputDir = path.resolve(options.inputDir);
   const extensions = normalizeExtensions(options.extensions);
   const exclude = new Set(options.exclude ?? DEFAULT_EXCLUDE);
@@ -112,7 +112,7 @@ export async function generateNameList(
   const inputDir = path.resolve(options.inputDir);
   const outputFile = path.resolve(options.outputFile);
   const outputDir = path.dirname(outputFile);
-  const names = await findWorkbenchEntryNames(options);
+  const names = await discoverWorkbenchFileNames(options);
 
   await mkdir(outputDir, { recursive: true });
   await writeFile(outputFile, renderNameList(names, outputFile, options.exportName));
@@ -127,7 +127,7 @@ export async function generateDemoManifest(
   const outputFile = path.resolve(options.outputFile);
   const outputDir = path.dirname(outputFile);
   const importPathPrefix = options.importPathPrefix ?? (path.relative(outputDir, inputDir) || ".");
-  const demos = await findWorkbenchEntryNames(options);
+  const demos = await discoverWorkbenchFileNames(options);
 
   await mkdir(outputDir, { recursive: true });
   await writeFile(outputFile, renderDemoManifest(demos, importPathPrefix));

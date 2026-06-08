@@ -191,16 +191,12 @@ const DemoCell = memo(function DemoCell({
     />
   );
 
-  const content = useMemo(
-    () =>
-      stableCssFiles.length ? (
-        <StyledAtom fileNames={stableCssFiles} fallback={<Loading />} encap>
-          {body}
-        </StyledAtom>
-      ) : (
-        body
-      ),
-    [stableCssFiles.toString(), body],
+  const content = stableCssFiles.length ? (
+    <StyledAtom fileNames={stableCssFiles} fallback={<Loading />} encap>
+      {body}
+    </StyledAtom>
+  ) : (
+    body
   );
 
   if (mode === "page") {
@@ -214,6 +210,7 @@ const DemoCell = memo(function DemoCell({
 
   // Compute the href for the demo card link
   const cardHref = `#/&${encodeURIComponent(pageName)}/${newTabPosition.scrollTop}/${newTabPosition.top}/${newTabPosition.left}/${encodeURIComponent(searchText)}`;
+
   const shouldRenderFallback = Boolean(
     (isScrolling && !hasLoadedObject) || state.activePage,
   );
@@ -235,7 +232,7 @@ const DemoCell = memo(function DemoCell({
         )}
       </div>
       <a
-        className="absolute left-0 top-0 h-full w-full cursor-pointer overflow-hidden text-ellipsis whitespace-nowrap px-25 text-center text-xs font-bold leading-7 dark:text-shadow-tS1Black"
+        className="absolute top-0 left-1/2 -translate-x-1/2 h-full w-full max-w-[186px] cursor-pointer overflow-hidden text-ellipsis whitespace-nowrap text-center text-xs font-bold leading-7 dark:text-shadow-tS1Black"
         href={cardHref}
         aria-disabled={!DynamicComponent}
         onClick={handleOpen}

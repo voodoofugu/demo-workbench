@@ -296,7 +296,7 @@ const DemoGrid = memo(function DemoGrid({
       : null;
 
   return (
-    <div className="h-calcScreenH-112 m-auto w-[calc(100%-20px)]">
+    <div className="h-calcScreenH-112 m-auto w-full">
       <MorphScroll
         className="templateScroll relative h-full w-full overflow-hidden"
         size="auto"
@@ -304,7 +304,9 @@ const DemoGrid = memo(function DemoGrid({
         gap={60}
         progressTrigger={{
           wheel: true,
-          progressElement: true,
+          progressElement: (
+            <div className="animate-ident relative flex h-full w-[12px] items-center justify-center overflow-hidden rounded-18 bg-indigo-100 text-indigo-500 shadow-shadow4 transition-all1 hover:bg-indigo-50 hover:shadow-shadow8 active:scale-95 dark:bg-indigo-900 dark:text-indigo-400 dark:shadow-shadow5 dark:hover:bg-indigo-800 dark:hover:shadow-shadow6 " />
+          ),
         }}
         edgeGradient={{ color: darkTheme ? "#1e1b4b" : "#c7d2fe" }}
         wrapperAlign={["center", "start"]}
@@ -314,6 +316,8 @@ const DemoGrid = memo(function DemoGrid({
         onScrollValue={handleScrollValue}
         crossCount={3}
         isScrolling={(v) => setIsScrolling(v)}
+        scrollBarEdge={30}
+        scrollBarOnHover
       >
         {components}
       </MorphScroll>

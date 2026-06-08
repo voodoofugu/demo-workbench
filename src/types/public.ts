@@ -74,8 +74,6 @@ export type DemoWorkbenchInitialState = {
     top?: number | string;
     left?: number | string;
   } | null;
-  /** Host-defined popup state persisted by the workbench. */
-  popupState?: unknown;
   /** Saved grid scroll position. */
   scrollTop?: number | false;
   /** Initial resize scale for opened demo content. */
@@ -110,11 +108,6 @@ export type DemoWorkbenchProps = {
   /** Dynamic style loader used by `styled-atom`, e.g. `(name) => import(...)`. */
   styleLoader?: (name: string) => Promise<unknown>;
   /** Host-level styled-atom CSS files loaded by the workbench shell and added to every demo preview. */
-  cssFiles?: string[];
-  /**
-   * Base styled-atom CSS files added to every demo preview.
-   * @deprecated Use `cssFiles`.
-   */
   baseCssFiles?: string[];
   /** Storage fields that should be persisted between reloads. */
   storageData?: DemoWorkbenchStorageEntry[];

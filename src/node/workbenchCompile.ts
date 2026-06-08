@@ -6,7 +6,7 @@ import path from "node:path";
 import { transform } from "lightningcss";
 import * as sass from "sass-embedded";
 
-import { findWorkbenchEntryNames } from "./generateDemoManifest";
+import { discoverWorkbenchFileNames } from "./generateDemoManifest";
 
 /** One input style file and the CSS file generated from it. */
 export type WorkbenchCompileStyleFile = {
@@ -40,17 +40,7 @@ export type WorkbenchCompileDemoOptions = {
   inputDir: string;
   /** File extensions to include. Defaults to `.jsx`, `.tsx`, `.js`, `.ts`. */
   extensions?: string[];
-  /** Basenames to exclude from the generated list. Defaults are provided by `findWorkbenchEntryNames`. */
-  exclude?: string[];
-};
-
-/** Options for discovering popup files and writing their names to the generated workbench registry. */
-export type WorkbenchCompileNameListOptions = {
-  /** Directory with popup modules. File basenames become popup names. */
-  inputDir: string;
-  /** File extensions to include. Defaults to `.jsx`, `.tsx`, `.js`, `.ts`. */
-  extensions?: string[];
-  /** Basenames to exclude from the generated list. Defaults are provided by `findWorkbenchEntryNames`. */
+  /** Basenames to exclude from the generated list. Defaults are provided by `discoverWorkbenchFileNames`. */
   exclude?: string[];
 };
 
@@ -60,8 +50,6 @@ export type WorkbenchCompileOptions = {
   styles?: WorkbenchCompileStylesOptions;
   /** Optional demo page registry section. */
   demos?: WorkbenchCompileDemoOptions;
-  /** Optional popup name registry section. */
-  popups?: WorkbenchCompileNameListOptions;
 };
 
 /** Result of compiling one or more style files. */
@@ -74,20 +62,20 @@ export type WorkbenchCompileStylesResult = {
   files: WorkbenchCompileStyleFile[];
 };
 
-/** Result of discovering a generated demo/popup name list. */
-export type WorkbenchCompileNameListResult = {
+/** Result of discovering the generated demo name list. */
+export type WorkbenchCompileDemoResult = {
   /** Absolute directory that was scanned. */
   inputDir: string;
   /** Generated names sorted by filename. */
   names: string[];
-  /** Registry files updated with the combined `{ demos, popups }` data. Empty when no writable registry target exists. */
+  /** Registry files updated with the generated `{ demos }` data. Empty when no writable registry target exists. */
   outputFiles: string[];
 };
 
 /**
  * Combined compile result.
  *
- * The shape mirrors the requested compile sections: `styles`, `demos` and `popups`.
+ * The shape mirrors the requested compile sections: `styles` and `demos`.
  * Watch rebuilds may return only the section that changed, for example only
  * `styles` when a single style file is recompiled.
  */
@@ -95,9 +83,7 @@ export type WorkbenchCompileResult = {
   /** Style compilation result, when `styles` options were compiled. */
   styles?: WorkbenchCompileStylesResult;
   /** Demo registry result, when `demos` options were compiled. */
-  demos?: WorkbenchCompileNameListResult;
-  /** Popup registry result, when `popups` options were compiled. */
-  popups?: WorkbenchCompileNameListResult;
+  demos?: WorkbenchCompileDemoResult;
 };
 
 export type WorkbenchCompileWatchOptions = WorkbenchCompileOptions & {
@@ -123,16 +109,12 @@ export type WorkbenchCompileWatchResult = {
 export type CompileWorkbenchStylesOptions = WorkbenchCompileStylesOptions & {
   /** Optional demo page directory to include in the generated registry. */
   demoInputDir?: string;
-  /** Optional popup directory to include in the generated registry. */
-  popupInputDir?: string;
 };
 
-/** Back-compatible helper result: style result plus optional generated demo/popup registry sections. */
+/** Style result plus an optional generated demo registry section. */
 export type CompileWorkbenchStylesResult = WorkbenchCompileStylesResult & {
   /** Demo registry result, when `demoInputDir` was provided. */
-  demos?: WorkbenchCompileNameListResult;
-  /** Popup registry result, when `popupInputDir` was provided. */
-  popups?: WorkbenchCompileNameListResult;
+  demos?: WorkbenchCompileDemoResult;
 };
 
 type StyleCompileEvent = {
@@ -164,25 +146,31 @@ function rewriteAssetUrls(css: string, assetUrlPrefix?: string) {
   if (!assetUrlPrefix) return css;
   const prefix = ensureTrailingSlash(assetUrlPrefix);
 
-  return css.replace(/url\((?:"|')?([^"')]+)(?:"|')?\)/g, (match, rawUrl: string) => {
-    const url = rawUrl.trim();
-    if (
-      url.startsWith("#") ||
-      /^[a-z][a-z0-9+.-]*:/i.test(url) ||
-      url.startsWith("//") ||
-      url.startsWith("data:")
-    ) {
-      return `url(${url})`;
-    }
+  return css.replace(
+    /url\((?:"|')?([^"')]+)(?:"|')?\)/g,
+    (match, rawUrl: string) => {
+      const url = rawUrl.trim();
+      if (
+        url.startsWith("#") ||
+        /^[a-z][a-z0-9+.-]*:/i.test(url) ||
+        url.startsWith("//") ||
+        url.startsWith("data:")
+      ) {
+        return `url(${url})`;
+      }
 
-    return `url(${prefix}${url.replace(/^\/+/, "")})`;
-  });
+      return `url(${prefix}${url.replace(/^\/+/, "")})`;
+    },
+  );
 }
 
 function replaceBodyInSelector(selector: string, replacement: string) {
-  return selector.replace(/(^|[\s>+~,])body(?=$|[.#:\[\s>+~,])/g, (_match, prefix: string) => {
-    return `${prefix}${replacement}`;
-  });
+  return selector.replace(
+    /(^|[\s>+~,])body(?=$|[.#:\[\s>+~,])/g,
+    (_match, prefix: string) => {
+      return `${prefix}${replacement}`;
+    },
+  );
 }
 
 function rewriteBodySelectors(css: string, replacement?: string) {
@@ -190,7 +178,7 @@ function rewriteBodySelectors(css: string, replacement?: string) {
 
   let result = "";
   let segmentStart = 0;
-  let inString: "\"" | "'" | null = null;
+  let inString: '"' | "'" | null = null;
   let inComment = false;
   let parenDepth = 0;
 
@@ -221,7 +209,7 @@ function rewriteBodySelectors(css: string, replacement?: string) {
       continue;
     }
 
-    if (char === "\"" || char === "'") {
+    if (char === '"' || char === "'") {
       inString = char;
       continue;
     }
@@ -290,13 +278,12 @@ async function fileExists(filePath: string) {
   }
 }
 
-function renderGeneratedRegistry(registry: { demos: string[]; popups: string[] }) {
+function renderGeneratedRegistry(registry: { demos: string[] }) {
   return [
-    'import type { WorkbenchFileRegistry } from "./workbenchNexus";',
+    'import type { WorkbenchFileRegistry } from "./nexus";',
     "",
     "export const generatedWorkbenchRegistry: WorkbenchFileRegistry = {",
     `  demos: ${JSON.stringify(registry.demos, null, 2).replace(/\n/g, "\n  ")},`,
-    `  popups: ${JSON.stringify(registry.popups, null, 2).replace(/\n/g, "\n  ")},`,
     "};",
     "",
     "export default generatedWorkbenchRegistry;",
@@ -304,13 +291,24 @@ function renderGeneratedRegistry(registry: { demos: string[]; popups: string[] }
   ].join("\n");
 }
 
-async function writeGeneratedRegistrySource(registry: { demos: string[]; popups: string[] }) {
+async function writeGeneratedRegistrySource(registry: { demos: string[] }) {
   const candidates = [
-    path.resolve(process.cwd(), "../demo-workbench/src/state/generatedWorkbenchRegistry.ts"),
-    path.resolve(process.cwd(), "node_modules/demo-workbench/src/state/generatedWorkbenchRegistry.ts"),
+    path.resolve(
+      process.cwd(),
+      "../demo-workbench/src/state/generatedWorkbenchRegistry.ts",
+    ),
+    path.resolve(
+      process.cwd(),
+      "node_modules/demo-workbench/src/state/generatedWorkbenchRegistry.ts",
+    ),
   ];
-  const outputFile = (await Promise.all(candidates.map(async (filePath) => ((await fileExists(filePath)) ? filePath : null))))
-    .find((filePath): filePath is string => Boolean(filePath));
+  const outputFile = (
+    await Promise.all(
+      candidates.map(async (filePath) =>
+        (await fileExists(filePath)) ? filePath : null,
+      ),
+    )
+  ).find((filePath): filePath is string => Boolean(filePath));
 
   if (!outputFile) return null;
 
@@ -318,83 +316,80 @@ async function writeGeneratedRegistrySource(registry: { demos: string[]; popups:
   return outputFile;
 }
 
-function renderBundledRegistry(registry: { demos: string[]; popups: string[] }) {
-  return `var generatedWorkbenchRegistry = {\n  demos: ${JSON.stringify(registry.demos, null, 2).replace(/\n/g, "\n  ")},\n  popups: ${JSON.stringify(registry.popups, null, 2).replace(/\n/g, "\n  ")}\n};`;
+function renderBundledRegistry(registry: { demos: string[] }) {
+  return `var generatedWorkbenchRegistry = {\n  demos: ${JSON.stringify(registry.demos, null, 2).replace(/\n/g, "\n  ")}\n};`;
 }
 
-async function writeGeneratedRegistryBundle(registry: { demos: string[]; popups: string[] }) {
+async function writeGeneratedRegistryBundle(registry: { demos: string[] }) {
   const candidates = [
     path.resolve(process.cwd(), "../demo-workbench/dist/index.js"),
     path.resolve(process.cwd(), "../demo-workbench/dist/index.cjs"),
     path.resolve(process.cwd(), "node_modules/demo-workbench/dist/index.js"),
     path.resolve(process.cwd(), "node_modules/demo-workbench/dist/index.cjs"),
   ];
-  const outputFiles = (await Promise.all(candidates.map(async (filePath) => ((await fileExists(filePath)) ? filePath : null))))
-    .filter((filePath): filePath is string => Boolean(filePath));
-  const registryPattern = /var generatedWorkbenchRegistry = \{\n  demos: [\s\S]*?\n  popups: [\s\S]*?\n\};/;
+  const outputFiles = (
+    await Promise.all(
+      candidates.map(async (filePath) =>
+        (await fileExists(filePath)) ? filePath : null,
+      ),
+    )
+  ).filter((filePath): filePath is string => Boolean(filePath));
+  const registryPattern =
+    /var generatedWorkbenchRegistry = \{\n  demos: [\s\S]*?(?:,\n  popups: [\s\S]*?)?\n\};/;
   const renderedRegistry = renderBundledRegistry(registry);
   const writtenFiles: string[] = [];
 
   for (const outputFile of outputFiles) {
     const source = await readFile(outputFile, "utf8");
     if (!registryPattern.test(source)) continue;
-    await writeFile(outputFile, source.replace(registryPattern, renderedRegistry));
+    await writeFile(
+      outputFile,
+      source.replace(registryPattern, renderedRegistry),
+    );
     writtenFiles.push(outputFile);
   }
 
   return writtenFiles;
 }
 
-async function writeGeneratedRegistry(registry: { demos: string[]; popups: string[] }) {
+async function writeGeneratedRegistry(registry: { demos: string[] }) {
   const [sourceFile, bundleFiles] = await Promise.all([
     writeGeneratedRegistrySource(registry),
     writeGeneratedRegistryBundle(registry),
   ]);
 
-  return [sourceFile, ...bundleFiles].filter((filePath): filePath is string => Boolean(filePath));
+  return [sourceFile, ...bundleFiles].filter((filePath): filePath is string =>
+    Boolean(filePath),
+  );
 }
 
-async function compileGeneratedRegistry(options: WorkbenchCompileOptions): Promise<Pick<WorkbenchCompileResult, "demos" | "popups">> {
-  if (!options.demos && !options.popups) return {};
+async function compileGeneratedRegistry(
+  options: WorkbenchCompileOptions,
+): Promise<Pick<WorkbenchCompileResult, "demos">> {
+  if (!options.demos) return {};
 
-  const [demoNames, popupNames] = await Promise.all([
-    options.demos
-      ? findWorkbenchEntryNames({
-          inputDir: options.demos.inputDir,
-          extensions: options.demos.extensions,
-          exclude: options.demos.exclude,
-        })
-      : Promise.resolve<string[]>([]),
-    options.popups
-      ? findWorkbenchEntryNames({
-          inputDir: options.popups.inputDir,
-          extensions: options.popups.extensions,
-          exclude: options.popups.exclude,
-        })
-      : Promise.resolve<string[]>([]),
-  ]);
+  const demoNames = await discoverWorkbenchFileNames({
+    inputDir: options.demos.inputDir,
+    extensions: options.demos.extensions,
+    exclude: options.demos.exclude,
+  });
 
-  const outputFiles = await writeGeneratedRegistry({ demos: demoNames, popups: popupNames });
+  const outputFiles = await writeGeneratedRegistry({ demos: demoNames });
 
   return {
-    demos: options.demos
-      ? {
-          inputDir: path.resolve(options.demos.inputDir),
-          names: demoNames,
-          outputFiles,
-        }
-      : undefined,
-    popups: options.popups
-      ? {
-          inputDir: path.resolve(options.popups.inputDir),
-          names: popupNames,
-          outputFiles,
-        }
-      : undefined,
+    demos: {
+      inputDir: path.resolve(options.demos.inputDir),
+      names: demoNames,
+      outputFiles,
+    },
   };
 }
 
-function getStyleFileResult(inputDir: string, outputDir: string, inputPath: string): WorkbenchCompileStyleFile {
+function getStyleFileResult(
+  inputDir: string,
+  outputDir: string,
+  inputPath: string,
+): WorkbenchCompileStyleFile {
   const inputFile = path.basename(inputPath);
   const outputFile = toOutputFile(inputFile);
   return {
@@ -417,7 +412,9 @@ async function compileStyleFile(
   try {
     compiledCss = await compileInputFile(inputPath, inputDir);
   } catch (error) {
-    throw new Error(`Failed to compile ${styleFile.inputFile}: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(
+      `Failed to compile ${styleFile.inputFile}: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 
   const rewrittenCss = rewriteAssetUrls(
@@ -432,7 +429,9 @@ async function compileStyleFile(
       minify: true,
     });
   } catch (error) {
-    throw new Error(`Failed to minify ${styleFile.inputFile}: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(
+      `Failed to minify ${styleFile.inputFile}: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 
   await writeFile(styleFile.outputPath, minified.code);
@@ -442,9 +441,14 @@ async function compileStyleFile(
 function dedupeStyleEvents(events: StyleCompileEvent[]) {
   const map = new Map<string, StyleCompileEvent>();
   for (const event of events) {
-    map.set(path.resolve(event.inputPath), { ...event, inputPath: path.resolve(event.inputPath) });
+    map.set(path.resolve(event.inputPath), {
+      ...event,
+      inputPath: path.resolve(event.inputPath),
+    });
   }
-  return [...map.values()].sort((left, right) => left.inputPath.localeCompare(right.inputPath));
+  return [...map.values()].sort((left, right) =>
+    left.inputPath.localeCompare(right.inputPath),
+  );
 }
 
 async function compileStyles(
@@ -464,7 +468,11 @@ async function compileStyles(
   if (events?.length) {
     for (const event of dedupeStyleEvents(events)) {
       if (!isStyleFile(event.inputPath)) continue;
-      const styleFile = getStyleFileResult(inputDir, outputDir, event.inputPath);
+      const styleFile = getStyleFileResult(
+        inputDir,
+        outputDir,
+        event.inputPath,
+      );
 
       if (event.event === "unlink") {
         await rm(styleFile.outputPath, { force: true });
@@ -472,7 +480,9 @@ async function compileStyles(
         continue;
       }
 
-      files.push(await compileStyleFile(options, inputDir, outputDir, event.inputPath));
+      files.push(
+        await compileStyleFile(options, inputDir, outputDir, event.inputPath),
+      );
     }
 
     return { inputDir, outputDir, files };
@@ -488,25 +498,38 @@ async function compileStyles(
   return { inputDir, outputDir, files };
 }
 
-export async function workbenchCompile(options: WorkbenchCompileOptions): Promise<WorkbenchCompileResult> {
-  const styles = options.styles ? await compileStyles(options.styles) : undefined;
+export async function workbenchCompile(
+  options: WorkbenchCompileOptions,
+): Promise<WorkbenchCompileResult> {
+  const styles = options.styles
+    ? await compileStyles(options.styles)
+    : undefined;
   const registry = await compileGeneratedRegistry(options);
 
   return { styles, ...registry };
 }
 
-export function getWorkbenchCompileWatchPaths(options: WorkbenchCompileOptions, extraPaths: string[] = []) {
+export function getWorkbenchCompileWatchPaths(
+  options: WorkbenchCompileOptions,
+  extraPaths: string[] = [],
+) {
   return [
     options.styles?.inputDir,
     options.demos?.inputDir,
-    options.popups?.inputDir,
     ...extraPaths,
   ].filter((value): value is string => Boolean(value));
 }
 
 function isPathInDirectory(filePath: string, directory: string) {
-  const relative = path.relative(path.resolve(directory), path.resolve(filePath));
-  return Boolean(relative) && !relative.startsWith("..") && !path.isAbsolute(relative);
+  const relative = path.relative(
+    path.resolve(directory),
+    path.resolve(filePath),
+  );
+  return (
+    Boolean(relative) &&
+    !relative.startsWith("..") &&
+    !path.isAbsolute(relative)
+  );
 }
 
 async function compileWatchEvents(
@@ -517,21 +540,36 @@ async function compileWatchEvents(
   if (!events.length) return workbenchCompile(options);
 
   const hasExtraChange = events.some((event) =>
-    extraWatchPaths.some((watchPath) => path.resolve(event.inputPath) === path.resolve(watchPath) || isPathInDirectory(event.inputPath, watchPath)),
+    extraWatchPaths.some(
+      (watchPath) =>
+        path.resolve(event.inputPath) === path.resolve(watchPath) ||
+        isPathInDirectory(event.inputPath, watchPath),
+    ),
   );
   if (hasExtraChange) return workbenchCompile(options);
 
   const styleEvents = options.styles
-    ? events.filter((event) => isPathInDirectory(event.inputPath, options.styles!.inputDir) && isStyleFile(event.inputPath))
+    ? events.filter(
+        (event) =>
+          isPathInDirectory(event.inputPath, options.styles!.inputDir) &&
+          isStyleFile(event.inputPath),
+      )
     : [];
   const styleDependencyChanged = options.styles
-    ? events.some((event) => isPathInDirectory(event.inputPath, options.styles!.inputDir) && isStyleSource(event.inputPath) && !isStyleFile(event.inputPath))
+    ? events.some(
+        (event) =>
+          isPathInDirectory(event.inputPath, options.styles!.inputDir) &&
+          isStyleSource(event.inputPath) &&
+          !isStyleFile(event.inputPath),
+      )
     : false;
   const demoChanged = options.demos
-    ? events.some((event) => path.resolve(event.inputPath) === path.resolve(options.demos!.inputDir) || isPathInDirectory(event.inputPath, options.demos!.inputDir))
-    : false;
-  const popupChanged = options.popups
-    ? events.some((event) => path.resolve(event.inputPath) === path.resolve(options.popups!.inputDir) || isPathInDirectory(event.inputPath, options.popups!.inputDir))
+    ? events.some(
+        (event) =>
+          path.resolve(event.inputPath) ===
+            path.resolve(options.demos!.inputDir) ||
+          isPathInDirectory(event.inputPath, options.demos!.inputDir),
+      )
     : false;
 
   const styles = options.styles
@@ -541,17 +579,26 @@ async function compileWatchEvents(
         ? await compileStyles(options.styles, styleEvents)
         : undefined
     : undefined;
-  const registry = demoChanged || popupChanged ? await compileGeneratedRegistry(options) : {};
+  const registry = demoChanged ? await compileGeneratedRegistry(options) : {};
 
-  if (!styles && !registry.demos && !registry.popups) return workbenchCompile(options);
+  if (!styles && !registry.demos) return workbenchCompile(options);
   return { styles, ...registry };
 }
 
 export async function watchWorkbenchCompile(
   options: WorkbenchCompileWatchOptions,
 ): Promise<WorkbenchCompileWatchResult> {
-  const { debounceMs = 80, onBuild, onError, watchPaths: extraWatchPaths = [], ...compileOptions } = options;
-  const watchPaths = getWorkbenchCompileWatchPaths(compileOptions, extraWatchPaths);
+  const {
+    debounceMs = 80,
+    onBuild,
+    onError,
+    watchPaths: extraWatchPaths = [],
+    ...compileOptions
+  } = options;
+  const watchPaths = getWorkbenchCompileWatchPaths(
+    compileOptions,
+    extraWatchPaths,
+  );
 
   const runBuild = async (events?: StyleCompileEvent[]) => {
     const result = events?.length
@@ -574,7 +621,10 @@ export async function watchWorkbenchCompile(
 
   let pending: NodeJS.Timeout | null = null;
   let pendingEvents: StyleCompileEvent[] = [];
-  const scheduleBuild = (event: StyleCompileEvent["event"], inputPath: string) => {
+  const scheduleBuild = (
+    event: StyleCompileEvent["event"],
+    inputPath: string,
+  ) => {
     pendingEvents.push({ event, inputPath });
     if (pending) clearTimeout(pending);
     pending = setTimeout(() => {
@@ -612,27 +662,21 @@ export async function compileWorkbenchStyles(
       assetUrlPrefix: options.assetUrlPrefix,
       clean: options.clean,
     },
-    demos:
-      options.demoInputDir
-        ? {
-            inputDir: options.demoInputDir,
-          }
-        : undefined,
-    popups:
-      options.popupInputDir
-        ? {
-            inputDir: options.popupInputDir,
-          }
-        : undefined,
+    demos: options.demoInputDir
+      ? {
+          inputDir: options.demoInputDir,
+        }
+      : undefined,
   });
 
   if (!result.styles) {
-    throw new Error("compileWorkbenchStyles requires style input/output options");
+    throw new Error(
+      "compileWorkbenchStyles requires style input/output options",
+    );
   }
 
   return {
     ...result.styles,
     demos: result.demos,
-    popups: result.popups,
   };
 }

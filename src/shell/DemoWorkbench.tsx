@@ -45,7 +45,6 @@ const defaultStorageData: DemoWorkbenchStorageEntry[] = [
   ["searchData"],
   ["searchText"],
   ["pageData"],
-  ["popupState"],
   ["scrollTop"],
   ["windowScale"],
 ];
@@ -68,7 +67,6 @@ export default function DemoWorkbench({
   demos,
   demoLoader,
   styleLoader,
-  cssFiles,
   baseCssFiles,
   storageData = defaultStorageData,
   viewport = defaultViewport,
@@ -94,7 +92,7 @@ export default function DemoWorkbench({
     return styleLoaderRef.current(fileName);
   }, []);
 
-  const rawHostCssFiles = cssFiles ?? baseCssFiles ?? ["output"];
+  const rawHostCssFiles = baseCssFiles ?? ["output"];
   const hostCssFiles = useStableStringList(rawHostCssFiles);
   const orderedCssFiles = useStableStringList([
     WORKBENCH_STYLE_ATOM,

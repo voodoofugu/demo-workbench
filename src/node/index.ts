@@ -7,9 +7,8 @@ export {
 export type {
   CompileWorkbenchStylesOptions,
   CompileWorkbenchStylesResult,
+  WorkbenchCompileDemoResult,
   WorkbenchCompileDemoOptions,
-  WorkbenchCompileNameListOptions,
-  WorkbenchCompileNameListResult,
   WorkbenchCompileOptions,
   WorkbenchCompileResult,
   WorkbenchCompileStyleFile,
@@ -18,5 +17,9 @@ export type {
   WorkbenchCompileWatchOptions,
   WorkbenchCompileWatchResult,
 } from "./workbenchCompile";
-export { findWorkbenchEntryNames } from "./generateDemoManifest";
-export type { WorkbenchEntryListOptions } from "./generateDemoManifest";
+export {
+  discoverWorkbenchFileNames,
+} from "./generateDemoManifest";
+export type {
+  WorkbenchFileNameDiscoveryOptions,
+} from "./generateDemoManifest";

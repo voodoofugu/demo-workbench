@@ -5,9 +5,8 @@ export {
 export type {
   CompileWorkbenchStylesOptions,
   CompileWorkbenchStylesResult,
+  WorkbenchCompileDemoResult,
   WorkbenchCompileDemoOptions,
-  WorkbenchCompileNameListOptions,
-  WorkbenchCompileNameListResult,
   WorkbenchCompileOptions,
   WorkbenchCompileResult,
   WorkbenchCompileStyleFile,

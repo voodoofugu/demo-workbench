@@ -19,10 +19,7 @@ test("DemoGrid reads active page/search/scroll from workbench state, not storage
 });
 
 test("workbench state has defaults for restored template state", async () => {
-  const state = await readFile(
-    path.join(root, "src/state/workbenchNexus.ts"),
-    "utf8",
-  );
+  const state = await readFile(path.join(root, "src/state/workbench"), "utf8");
 
   assert.match(state, /activePage:\s*""/);
   assert.match(state, /pageData:\s*null/);
@@ -77,7 +74,7 @@ test("buttons use safe click semantics and nexus functional updates", async () =
         "utf8",
       ),
       readFile(path.join(root, "src/components/DemoGrid.tsx"), "utf8"),
-      readFile(path.join(root, "src/state/workbenchNexus.ts"), "utf8"),
+      readFile(path.join(root, "src/state/workbench"), "utf8"),
       readFile(
         path.join(root, "src/components/buttons/ToTopButton.tsx"),
         "utf8",
@@ -129,7 +126,7 @@ test("storage hydrates nexus once and subscribes to later state changes", async 
   assert.match(storageHook, /state\[item\.name\]/);
   assert.match(
     workbenchStorage,
-    /useStorageItems\(storageData, workbenchNexus, false\)/,
+    /useStorageItems\(storageData, nexus, false\)/,
   );
   assert.doesNotMatch(workbenchStorage, /useWorkbenchStore/);
 });
@@ -173,7 +170,10 @@ test("DemoWorkbench exposes one stable host cssFiles list and keeps cssFiles as 
     demoWorkbench,
     /rawHostCssFiles = cssFiles \?\? baseCssFiles \?\? \["output"\]/,
   );
-  assert.match(demoWorkbench, /hostCssFiles = useStableStringList\(rawHostCssFiles\)/);
+  assert.match(
+    demoWorkbench,
+    /hostCssFiles = useStableStringList\(rawHostCssFiles\)/,
+  );
   assert.match(demoWorkbench, /orderedCssFiles = useStableStringList\(/);
   assert.match(demoWorkbench, /styleLoaderRef/);
   assert.match(demoCell, /stableCssFiles = useStableStringList\(cssFiles\)/);

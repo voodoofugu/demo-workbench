@@ -8,3 +8,7 @@
   filter: grayscale(calc(1 - var(--content-visibility)))
     blur(calc((1 - var(--content-visibility)) * 2px));
 }
+
+.templateScroll .ms-bar {
+  right: 30px;
+}

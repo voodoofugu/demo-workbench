@@ -1,10 +1,7 @@
 import type { ReactNode } from "react";
 import { useMemo, useRef } from "react";
 
-import workbenchNexus, {
-  type WorkbenchState,
-  type WorkbenchStateUpdate,
-} from "./workbenchNexus";
+import nexus, { type WorkbenchState, type WorkbenchStateUpdate } from "./nexus";
 import generatedWorkbenchRegistry from "./generatedWorkbenchRegistry";
 import type { DemoWorkbenchInitialState } from "../types/public";
 
@@ -27,7 +24,7 @@ export function WorkbenchStateProvider({
 
   if (appliedInitialStateKeyRef.current !== resolvedInitialStateKey) {
     appliedInitialStateKeyRef.current = resolvedInitialStateKey;
-    workbenchNexus.set(resolvedInitialState);
+    nexus.set(resolvedInitialState);
   }
 
   return children;
@@ -37,11 +34,8 @@ export function useWorkbenchStore(): {
   state: WorkbenchState;
   setWorkbenchState: (state: WorkbenchStateUpdate) => void;
 } {
-  const state = workbenchNexus.use();
-  const setWorkbenchState = useMemo(
-    () => workbenchNexus.set.bind(workbenchNexus),
-    [],
-  );
+  const state = nexus.use();
+  const setWorkbenchState = useMemo(() => nexus.set.bind(nexus), []);
 
   return { state, setWorkbenchState };
 }
@@ -49,11 +43,11 @@ export function useWorkbenchStore(): {
 export function useWorkbenchValue<Key extends keyof WorkbenchState>(
   key: Key,
 ): WorkbenchState[Key] {
-  return workbenchNexus.use(key as any);
+  return nexus.use(key as any);
 }
 
 export function useWorkbenchActions(): (state: WorkbenchStateUpdate) => void {
-  return useMemo(() => workbenchNexus.set.bind(workbenchNexus), []);
+  return useMemo(() => nexus.set.bind(nexus), []);
 }
 
-export { workbenchNexus };
+export { nexus };

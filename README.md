@@ -191,7 +191,7 @@ type DemoModule = {
 
 ###### **— NODE —**
 
-<details><summary><b><code>workbenchCompile</code></b>: <em>compile styles and generated demo/popup registry</em></summary><br /><ul><div>
+<details><summary><b><code>workbenchCompile</code></b>: <em>compile styles and generated demo registry</em></summary><br /><ul><div>
 
 <b>Usage:</b><br />
 
@@ -206,17 +206,15 @@ const result = await workbenchCompile({
     assetUrlPrefix: "http://localhost:3000/img/",
   },
   demos: { inputDir: "src/components/pages" },
-  popups: { inputDir: "src/components/popups" },
 });
 
 console.log(result.styles?.files.length);
 console.log(result.demos?.names);
-console.log(result.popups?.names);
 ```
 
 <b>Description:</b><em><br />
-Runs the requested compile sections and returns the same top-level shape: <code>{ styles, demos, popups }</code>.<br />
-Styles are compiled from top-level <code>.css</code>, <code>.scss</code> and <code>.sass</code> files, minified, optionally rewritten, and written as <code>.css</code> files. Demo and popup names are discovered from file basenames and written to the generated workbench registry when a target is available.
+Runs the requested compile sections and returns the same top-level shape: <code>{ styles, demos }</code>.<br />
+Styles are compiled from top-level <code>.css</code>, <code>.scss</code> and <code>.sass</code> files, minified, optionally rewritten, and written as <code>.css</code> files. Demo names are discovered from file basenames and written to the generated workbench registry when a target is available.
 </em><br />
 
 <b>Signature:</b><br />
@@ -244,13 +242,28 @@ type WorkbenchCompileResult = {
     names: string[];
     outputFiles: string[];
   };
-  popups?: {
-    inputDir: string;
-    names: string[];
-    outputFiles: string[];
-  };
 };
 ```
+
+</div></ul></details>
+
+<h2></h2>
+
+<details><summary><b><code>discoverWorkbenchFileNames</code></b>: <em>read sorted file basenames from a folder</em></summary><br /><ul><div>
+
+<b>Usage:</b><br />
+
+```ts
+import { discoverWorkbenchFileNames } from "demo-workbench/node";
+
+const popupNames = await discoverWorkbenchFileNames({
+  inputDir: "src/components/popups",
+});
+```
+
+<b>Description:</b><em><br />
+Scans one directory and returns sorted file basenames. By default it includes <code>.jsx</code>, <code>.tsx</code>, <code>.js</code> and <code>.ts</code> files, while ignoring dotfiles, <code>.d.ts</code>, <code>_*</code>, <code>a_*</code> and explicitly excluded basenames.
+</em><br />
 
 </div></ul></details>
 
@@ -270,7 +283,6 @@ await watchWorkbenchCompile({
     bodySelectorReplacement: ".likeBody",
   },
   demos: { inputDir: "src/components/pages" },
-  popups: { inputDir: "src/components/popups" },
   onBuild: (result) => {
     if (result.styles) {
       console.log(result.styles.files.map((file) => file.outputFile));
@@ -280,7 +292,7 @@ await watchWorkbenchCompile({
 ```
 
 <b>Description:</b><em><br />
-Starts with one full compile. After that, direct changes to one top-level style file recompile only that file. Changes to Sass partials such as <code>_mixins.scss</code> trigger a full style compile because dependency ownership is ambiguous. Demo/popup changes regenerate only the registry sections.
+Starts with one full compile. After that, direct changes to one top-level style file recompile only that file. Changes to Sass partials such as <code>_mixins.scss</code> trigger a full style compile because dependency ownership is ambiguous. Demo changes regenerate only the registry section.
 </em><br />
 
 <b>Return:</b><br />
@@ -295,7 +307,7 @@ await watch.close();
 
 <h2></h2>
 
-<details><summary><b><code>compileWorkbenchStyles</code></b>: <em>back-compatible style-first helper</em></summary><br /><ul><div>
+<details><summary><b><code>compileWorkbenchStyles</code></b>: <em>style-first helper</em></summary><br /><ul><div>
 
 <b>Usage:</b><br />
 
@@ -306,12 +318,11 @@ const result = await compileWorkbenchStyles({
   inputDir: "titans_rc/styles/scss",
   outputDir: "src/styles/css",
   demoInputDir: "src/components/pages",
-  popupInputDir: "src/components/popups",
 });
 ```
 
 <b>Description:</b><em><br />
-Convenience wrapper around <code>workbenchCompile</code> for older scripts that primarily compile styles. It returns the style result at the top level and optional <code>demos</code>/<code>popups</code> registry sections.
+Convenience wrapper around <code>workbenchCompile</code> for scripts that primarily compile styles. It returns the style result at the top level and an optional <code>demos</code> registry section.
 </em><br />
 
 </div></ul></details>
@@ -367,7 +378,6 @@ const options = {
     bodySelectorReplacement: ".likeBody",
   },
   demos: { inputDir: "src/components/pages" },
-  popups: { inputDir: "src/components/popups" },
 };
 
 await workbenchCompile(options);
@@ -376,7 +386,6 @@ await watchWorkbenchCompile({
   onBuild: (result) => {
     if (result.styles) console.log("styles", result.styles.files.length);
     if (result.demos) console.log("demos", result.demos.names.length);
-    if (result.popups) console.log("popups", result.popups.names.length);
   },
 });
 ```

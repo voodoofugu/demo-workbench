@@ -1,9 +1,6 @@
 import type { DemoWorkbenchStorageEntry } from "../types/public";
-import type { WorkbenchState } from "../state/workbenchNexus";
-import {
-  getBrowserStorage,
-  parseStoredValue,
-} from "./storage.js";
+import type { WorkbenchState } from "../state/nexus";
+import { getBrowserStorage, parseStoredValue } from "./storage.js";
 
 export function normalizeStorageEntries(
   storageData: DemoWorkbenchStorageEntry[] = [],

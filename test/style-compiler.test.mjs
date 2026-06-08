@@ -4,7 +4,12 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { compileWorkbenchStyles, watchWorkbenchCompile, workbenchCompile } from "../dist/node/index.js";
+import {
+  compileWorkbenchStyles,
+  discoverWorkbenchFileNames,
+  watchWorkbenchCompile,
+  workbenchCompile,
+} from "../dist/node/index.js";
 
 async function withTempDir(fn) {
   const dir = await mkdtemp(path.join(os.tmpdir(), "demo-workbench-styles-"));
@@ -56,7 +61,7 @@ test("compileWorkbenchStyles compiles scss/css, rewrites body selectors, url ass
   });
 });
 
-test("workbenchCompile returns section-shaped styles, demos, and popups results", async () => {
+test("workbenchCompile returns section-shaped styles and demos results", async () => {
   const registryPath = path.join(process.cwd(), "src/state/generatedWorkbenchRegistry.ts");
   const originalRegistry = await readFile(registryPath, "utf8");
 
@@ -65,13 +70,10 @@ test("workbenchCompile returns section-shaped styles, demos, and popups results"
       const styleInputDir = path.join(dir, "styles");
       const styleOutputDir = path.join(dir, "output");
       const demoInputDir = path.join(dir, "demos");
-      const popupInputDir = path.join(dir, "popups");
       await mkdir(styleInputDir, { recursive: true });
       await mkdir(demoInputDir, { recursive: true });
-      await mkdir(popupInputDir, { recursive: true });
       await writeFile(path.join(styleInputDir, "one.scss"), `.item { color: blue; }\n`);
       await writeFile(path.join(demoInputDir, "AlphaDemo.tsx"), `export default function AlphaDemo() { return null; }\n`);
-      await writeFile(path.join(popupInputDir, "InfoPopup.tsx"), `export default function InfoPopup() { return null; }\n`);
 
       const result = await workbenchCompile({
         styles: {
@@ -79,18 +81,32 @@ test("workbenchCompile returns section-shaped styles, demos, and popups results"
           outputDir: styleOutputDir,
         },
         demos: { inputDir: demoInputDir },
-        popups: { inputDir: popupInputDir },
       });
 
-      assert.deepEqual(Object.keys(result).sort(), ["demos", "popups", "styles"]);
+      assert.deepEqual(Object.keys(result).sort(), ["demos", "styles"]);
       assert.deepEqual(result.styles.files.map((file) => file.outputFile), ["one.css"]);
       assert.deepEqual(result.demos.names, ["AlphaDemo"]);
-      assert.deepEqual(result.popups.names, ["InfoPopup"]);
       assert.equal("fileRegistry" in result, false);
     });
   } finally {
     await writeFile(registryPath, originalRegistry);
   }
+});
+
+test("discoverWorkbenchFileNames returns sorted module basenames", async () => {
+  await withTempDir(async (dir) => {
+    await writeFile(path.join(dir, "Beta.tsx"), `export default null;\n`);
+    await writeFile(path.join(dir, "Alpha.jsx"), `export default null;\n`);
+    await writeFile(path.join(dir, "notes.md"), `# ignored\n`);
+    await writeFile(path.join(dir, "_Private.tsx"), `export default null;\n`);
+    await writeFile(path.join(dir, "a_popupList.json"), `[]\n`);
+    await writeFile(path.join(dir, "Types.d.ts"), `export type T = string;\n`);
+
+    assert.deepEqual(await discoverWorkbenchFileNames({ inputDir: dir }), [
+      "Alpha",
+      "Beta",
+    ]);
+  });
 });
 
 function waitForBuild(builds, count) {
@@ -135,7 +151,6 @@ test("watchWorkbenchCompile recompiles only the changed top-level style file", a
 
       assert.deepEqual(builds[1].styles.files.map((file) => file.outputFile), ["two.css"]);
       assert.equal(builds[1].demos, undefined);
-      assert.equal(builds[1].popups, undefined);
       assert.match(await readFile(path.join(outputDir, "two.css"), "utf8"), /green/);
     } finally {
       await watch.close();

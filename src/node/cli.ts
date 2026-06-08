@@ -28,7 +28,7 @@ function parseArgs(args: string[]): CliOptions {
 
   if (!inputDir || !outputDir) {
     throw new Error(
-      "Usage: demo-workbench-styles build --input <stylesDir> --output <cssOutputDir> [--body-selector .likeBody] [--asset-url-prefix http://localhost:3000/img/] [--pages-input <pagesDir>] [--popups-input <popupsDir>] [--clean]",
+      "Usage: demo-workbench-styles build --input <stylesDir> --output <cssOutputDir> [--body-selector .likeBody] [--asset-url-prefix http://localhost:3000/img/] [--pages-input <pagesDir>] [--clean]",
     );
   }
 
@@ -40,17 +40,16 @@ function parseArgs(args: string[]): CliOptions {
     clean: hasFlag(args, ["--clean"]),
     watch: args[0] === "watch" || hasFlag(args, ["--watch"]),
     demoInputDir: readFlag(args, ["--pages-input", "--demos-input", "--demo-input"]),
-    popupInputDir: readFlag(args, ["--popups-input", "--popup-input"]),
   };
 }
 
-function printRegistryResult(result: Pick<WorkbenchCompileResult, "demos" | "popups">) {
-  if (!result.demos && !result.popups) return;
+function printRegistryResult(result: Pick<WorkbenchCompileResult, "demos">) {
+  if (!result.demos) return;
 
-  const outputFiles = result.demos?.outputFiles ?? result.popups?.outputFiles ?? [];
+  const outputFiles = result.demos.outputFiles;
   const target = outputFiles.length ? outputFiles.join(", ") : "internal registry";
   console.log(
-    `demo-workbench registry: stored ${result.demos?.names.length ?? 0} demo(s), ${result.popups?.names.length ?? 0} popup name(s): ${target}`,
+    `demo-workbench registry: stored ${result.demos.names.length} demo(s): ${target}`,
   );
 }
 
@@ -80,13 +79,11 @@ async function main() {
   const watchPaths = getWorkbenchCompileWatchPaths({
     styles: options,
     demos: options.demoInputDir ? { inputDir: options.demoInputDir } : undefined,
-    popups: options.popupInputDir ? { inputDir: options.popupInputDir } : undefined,
   });
   console.log(`demo-workbench styles: watching ${watchPaths.join(", ")}`);
   await watchWorkbenchCompile({
     styles: options,
     demos: options.demoInputDir ? { inputDir: options.demoInputDir } : undefined,
-    popups: options.popupInputDir ? { inputDir: options.popupInputDir } : undefined,
     debounceMs: 50,
     onBuild: printResult,
   });
