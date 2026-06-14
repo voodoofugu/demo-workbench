@@ -143,11 +143,20 @@ function WorkbenchGlobalStyles({
   );
 }
 
-/**
- * Searchable React shell for local component/demo development.
- *
- * DemoWorkbench owns the browser-like grid, search, persistence and modal shell.
- * The host project only supplies a lazy demo manifest and optional rendering hooks.
+/**---
+ * ## ![logo](https://github.com/voodoofugu/demo-workbench/raw/main/src/assets/demo-workbench-logo.png)
+ * ### ***DemoWorkbench***:
+ * searchable React shell for local component and screen demos.
+ * @description
+ * Renders the full reusable workbench UI: header, search, theme toggle, scrollable demo grid, loading state, opened-demo modal and persisted shell state. The host project supplies demos, style loading and optional render hooks while `demo-workbench` owns the repeated shell behavior.
+ * @example
+ * ```tsx
+ * <DemoWorkbench
+ *   title="Project demos"
+ *   demos={demos}
+ *   styleLoader={(name) => import(`./workbench-css/${name}.css`)}
+ * />
+ * ```
  */
 export default function DemoWorkbench({
   title = "Demo Workbench",

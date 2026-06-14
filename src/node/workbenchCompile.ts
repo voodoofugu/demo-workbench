@@ -12,7 +12,19 @@ import * as sass from "sass-embedded";
 import { discoverWorkbenchFileNames } from "./generateDemoManifest";
 import { toWorkbenchStyleClassName } from "../utils/workbenchStyleScope";
 
-/** One input style file and the CSS file generated from it. */
+/**---
+ * ## ![logo](https://github.com/voodoofugu/demo-workbench/raw/main/src/assets/demo-workbench-logo.png)
+ * ### ***WorkbenchCompileStyleFile***:
+ * one input style file and the CSS file generated from it.
+ * @description
+ * Returned for every style file touched by a full compile or an incremental watch rebuild.
+ * @example
+ * ```ts
+ * result.styles?.files.forEach((file) => {
+ *   console.log(file.inputFile, file.outputFile);
+ * });
+ * ```
+ */
 export type WorkbenchCompileStyleFile = {
   /** File name inside `WorkbenchCompileStylesOptions.inputDir`, for example `button.scss`. */
   inputFile: string;
@@ -24,7 +36,21 @@ export type WorkbenchCompileStyleFile = {
   outputPath: string;
 };
 
-/** Options for compiling project CSS/SCSS/Sass files used by demo pages. */
+/**---
+ * ## ![logo](https://github.com/voodoofugu/demo-workbench/raw/main/src/assets/demo-workbench-logo.png)
+ * ### ***WorkbenchCompileStylesOptions***:
+ * options for compiling project CSS, SCSS and Sass files used by demo pages.
+ * @description
+ * The compiler reads top-level style files, optionally scopes selectors under the workbench preview scope, rewrites relative assets, minifies CSS and writes one `.css` file per input file.
+ * @example
+ * ```ts
+ * const styles: WorkbenchCompileStylesOptions = {
+ *   inputDir: "titans_rc/styles/scss",
+ *   outputDir: "src/styles/workbench-css",
+ *   assetUrlPrefix: "http://localhost:3000/img/",
+ * };
+ * ```
+ */
 export type WorkbenchCompileStylesOptions = {
   /** Directory with top-level `.css`, `.scss` and `.sass` files. Files starting with `_` are treated as Sass partials and are not emitted directly. */
   inputDir: string;
@@ -38,7 +64,19 @@ export type WorkbenchCompileStylesOptions = {
   clean?: boolean;
 };
 
-/** Options for discovering demo page files and writing their names to the generated workbench registry. */
+/**---
+ * ## ![logo](https://github.com/voodoofugu/demo-workbench/raw/main/src/assets/demo-workbench-logo.png)
+ * ### ***WorkbenchCompileDemoOptions***:
+ * options for discovering demo page files.
+ * @description
+ * File basenames become workbench demo names and are written to the generated registry when a writable registry target is available.
+ * @example
+ * ```ts
+ * const demos: WorkbenchCompileDemoOptions = {
+ *   inputDir: "src/components/pages",
+ * };
+ * ```
+ */
 export type WorkbenchCompileDemoOptions = {
   /** Directory with demo page modules. File basenames become demo names. */
   inputDir: string;
@@ -48,7 +86,20 @@ export type WorkbenchCompileDemoOptions = {
   exclude?: string[];
 };
 
-/** Top-level compile options. Pass only the sections a host project wants demo-workbench to manage. */
+/**---
+ * ## ![logo](https://github.com/voodoofugu/demo-workbench/raw/main/src/assets/demo-workbench-logo.png)
+ * ### ***WorkbenchCompileOptions***:
+ * top-level compile options.
+ * @description
+ * Pass only the sections a host project wants `demo-workbench` to manage. `styles` and `demos` can be used independently or together.
+ * @example
+ * ```ts
+ * await workbenchCompile({
+ *   styles: { inputDir: "styles/scss", outputDir: "src/workbench-css" },
+ *   demos: { inputDir: "src/components/pages" },
+ * });
+ * ```
+ */
 export type WorkbenchCompileOptions = {
   /** Optional style compilation section. */
   styles?: WorkbenchCompileStylesOptions;
@@ -56,7 +107,13 @@ export type WorkbenchCompileOptions = {
   demos?: WorkbenchCompileDemoOptions;
 };
 
-/** Result of compiling one or more style files. */
+/**---
+ * ## ![logo](https://github.com/voodoofugu/demo-workbench/raw/main/src/assets/demo-workbench-logo.png)
+ * ### ***WorkbenchCompileStylesResult***:
+ * result of compiling one or more style files.
+ * @description
+ * In watch mode `files` can contain only the style file that changed. Full compiles return every emitted top-level style file.
+ */
 export type WorkbenchCompileStylesResult = {
   /** Absolute input directory used for this compile. */
   inputDir: string;
@@ -66,7 +123,13 @@ export type WorkbenchCompileStylesResult = {
   files: WorkbenchCompileStyleFile[];
 };
 
-/** Result of discovering the generated demo name list. */
+/**---
+ * ## ![logo](https://github.com/voodoofugu/demo-workbench/raw/main/src/assets/demo-workbench-logo.png)
+ * ### ***WorkbenchCompileDemoResult***:
+ * result of discovering the generated demo name list.
+ * @description
+ * `names` are sorted file basenames. `outputFiles` contains registry files that were updated, and can be empty when no writable target exists.
+ */
 export type WorkbenchCompileDemoResult = {
   /** Absolute directory that was scanned. */
   inputDir: string;
@@ -76,12 +139,12 @@ export type WorkbenchCompileDemoResult = {
   outputFiles: string[];
 };
 
-/**
- * Combined compile result.
- *
- * The shape mirrors the requested compile sections: `styles` and `demos`.
- * Watch rebuilds may return only the section that changed, for example only
- * `styles` when a single style file is recompiled.
+/**---
+ * ## ![logo](https://github.com/voodoofugu/demo-workbench/raw/main/src/assets/demo-workbench-logo.png)
+ * ### ***WorkbenchCompileResult***:
+ * combined compile result.
+ * @description
+ * The shape mirrors the requested compile sections: `styles` and `demos`. Watch rebuilds may return only the section that changed, for example only `styles` when a single style file is recompiled.
  */
 export type WorkbenchCompileResult = {
   /** Style compilation result, when `styles` options were compiled. */
@@ -90,6 +153,21 @@ export type WorkbenchCompileResult = {
   demos?: WorkbenchCompileDemoResult;
 };
 
+/**---
+ * ## ![logo](https://github.com/voodoofugu/demo-workbench/raw/main/src/assets/demo-workbench-logo.png)
+ * ### ***WorkbenchCompileWatchOptions***:
+ * watch-mode compile options.
+ * @description
+ * Extends `WorkbenchCompileOptions` with extra watch paths, debounce, style reload and lifecycle callbacks. The first build is always a full compile.
+ * @example
+ * ```ts
+ * await watchWorkbenchCompile({
+ *   styles: { inputDir: "styles/scss", outputDir: "src/workbench-css" },
+ *   demos: { inputDir: "src/components/pages" },
+ *   styleReload: true,
+ * });
+ * ```
+ */
 export type WorkbenchCompileWatchOptions = WorkbenchCompileOptions & {
   /** Extra files/directories that should retrigger the full compile. */
   watchPaths?: string[];
@@ -103,6 +181,13 @@ export type WorkbenchCompileWatchOptions = WorkbenchCompileOptions & {
   onError?: (error: unknown) => void;
 };
 
+/**---
+ * ## ![logo](https://github.com/voodoofugu/demo-workbench/raw/main/src/assets/demo-workbench-logo.png)
+ * ### ***WorkbenchStyleReloadOptions***:
+ * options for the dev-only style reload endpoint.
+ * @description
+ * When enabled, `watchWorkbenchCompile` starts a small Server-Sent Events endpoint. The browser can receive changed style names and fetch fresh CSS text without remounting previews.
+ */
 export type WorkbenchStyleReloadOptions = {
   /** Local port for the style reload event stream. Defaults to 38297. */
   port?: number;
@@ -112,13 +197,26 @@ export type WorkbenchStyleReloadOptions = {
   path?: string;
 };
 
+/**---
+ * ## ![logo](https://github.com/voodoofugu/demo-workbench/raw/main/src/assets/demo-workbench-logo.png)
+ * ### ***WorkbenchStyleReloadManifest***:
+ * small JSON manifest written next to compiled workbench CSS.
+ * @description
+ * `DemoWorkbench` can poll this manifest through `styleReloadManifestUrl` and connect to the reload stream only while a watch script is alive.
+ */
 export type WorkbenchStyleReloadManifest = {
   enabled: boolean;
   styleReloadUrl?: string;
   updatedAt: string;
 };
 
-/** Handle returned by `watchWorkbenchCompile`. Call `close()` to stop the underlying chokidar watcher. */
+/**---
+ * ## ![logo](https://github.com/voodoofugu/demo-workbench/raw/main/src/assets/demo-workbench-logo.png)
+ * ### ***WorkbenchCompileWatchResult***:
+ * handle returned by `watchWorkbenchCompile`.
+ * @description
+ * Call `close()` to stop the underlying chokidar watcher, disable the style reload manifest and close the dev reload server.
+ */
 export type WorkbenchCompileWatchResult = {
   /** The raw chokidar watcher for advanced integrations. */
   watcher: FSWatcher;
@@ -128,13 +226,25 @@ export type WorkbenchCompileWatchResult = {
   close: () => Promise<void>;
 };
 
-/** Back-compatible helper options for projects that only call `compileWorkbenchStyles`. */
+/**---
+ * ## ![logo](https://github.com/voodoofugu/demo-workbench/raw/main/src/assets/demo-workbench-logo.png)
+ * ### ***CompileWorkbenchStylesOptions***:
+ * back-compatible helper options for style-first host scripts.
+ * @description
+ * Accepts the same style options as `workbenchCompile({ styles })` and can optionally include a demo input directory for registry generation.
+ */
 export type CompileWorkbenchStylesOptions = WorkbenchCompileStylesOptions & {
   /** Optional demo page directory to include in the generated registry. */
   demoInputDir?: string;
 };
 
-/** Style result plus an optional generated demo registry section. */
+/**---
+ * ## ![logo](https://github.com/voodoofugu/demo-workbench/raw/main/src/assets/demo-workbench-logo.png)
+ * ### ***CompileWorkbenchStylesResult***:
+ * style compile result plus an optional generated demo registry section.
+ * @description
+ * Returned by the legacy `compileWorkbenchStyles` helper.
+ */
 export type CompileWorkbenchStylesResult = WorkbenchCompileStylesResult & {
   /** Demo registry result, when `demoInputDir` was provided. */
   demos?: WorkbenchCompileDemoResult;
@@ -716,6 +826,23 @@ async function compileStyles(
   return { inputDir, outputDir, files };
 }
 
+/**---
+ * ## ![logo](https://github.com/voodoofugu/demo-workbench/raw/main/src/assets/demo-workbench-logo.png)
+ * ### ***workbenchCompile***:
+ * compile styles and generated demo registry sections.
+ * @description
+ * Runs the requested sections and returns the same top-level shape: `{ styles, demos }`. Style compilation writes minified CSS files, and demo compilation writes generated registry data when a target is available.
+ * @example
+ * ```ts
+ * const result = await workbenchCompile({
+ *   styles: {
+ *     inputDir: "titans_rc/styles/scss",
+ *     outputDir: "src/styles/workbench-css",
+ *   },
+ *   demos: { inputDir: "src/components/pages" },
+ * });
+ * ```
+ */
 export async function workbenchCompile(
   options: WorkbenchCompileOptions,
 ): Promise<WorkbenchCompileResult> {
@@ -730,6 +857,19 @@ export async function workbenchCompile(
   return { styles, ...registry };
 }
 
+/**---
+ * ## ![logo](https://github.com/voodoofugu/demo-workbench/raw/main/src/assets/demo-workbench-logo.png)
+ * ### ***getWorkbenchCompileWatchPaths***:
+ * derive default watch paths from compile options.
+ * @description
+ * Returns the style input directory, demo input directory and any extra host paths as a compact string list. Use it when a host script wants to print or extend the watch surface.
+ * @example
+ * ```ts
+ * const watchPaths = getWorkbenchCompileWatchPaths(options, [
+ *   "src/components/popups",
+ * ]);
+ * ```
+ */
 export function getWorkbenchCompileWatchPaths(
   options: WorkbenchCompileOptions,
   extraPaths: string[] = [],
@@ -756,6 +896,13 @@ function isPathInDirectory(filePath: string, directory: string) {
 const DEFAULT_STYLE_RELOAD_PORT = 38297;
 const DEFAULT_STYLE_RELOAD_HOST = "127.0.0.1";
 const DEFAULT_STYLE_RELOAD_PATH = "/demo-workbench-style-events";
+/**---
+ * ## ![logo](https://github.com/voodoofugu/demo-workbench/raw/main/src/assets/demo-workbench-logo.png)
+ * ### ***WORKBENCH_STYLE_RELOAD_MANIFEST_FILE***:
+ * file name used for the generated style reload manifest.
+ * @description
+ * `watchWorkbenchCompile` writes this JSON file into the compiled style output directory so `DemoWorkbench` can discover the active reload server through `styleReloadManifestUrl`.
+ */
 export const WORKBENCH_STYLE_RELOAD_MANIFEST_FILE =
   "demo-workbench-style-reload.json";
 
@@ -963,6 +1110,25 @@ async function compileWatchEvents(
   return { styles, ...registry };
 }
 
+/**---
+ * ## ![logo](https://github.com/voodoofugu/demo-workbench/raw/main/src/assets/demo-workbench-logo.png)
+ * ### ***watchWorkbenchCompile***:
+ * watch host project files and rebuild only what changed.
+ * @description
+ * Starts with one full compile. Direct changes to one top-level style file recompile only that file. Sass partial changes trigger a full style compile, and demo file changes regenerate only the registry section. When `styleReload` is enabled, changed CSS can be pushed into mounted workbench previews.
+ * @example
+ * ```ts
+ * const watch = await watchWorkbenchCompile({
+ *   styles: {
+ *     inputDir: "titans_rc/styles/scss",
+ *     outputDir: "src/styles/workbench-css",
+ *   },
+ *   styleReload: true,
+ * });
+ *
+ * await watch.close();
+ * ```
+ */
 export async function watchWorkbenchCompile(
   options: WorkbenchCompileWatchOptions,
 ): Promise<WorkbenchCompileWatchResult> {
@@ -1052,6 +1218,21 @@ export async function watchWorkbenchCompile(
   };
 }
 
+/**---
+ * ## ![logo](https://github.com/voodoofugu/demo-workbench/raw/main/src/assets/demo-workbench-logo.png)
+ * ### ***compileWorkbenchStyles***:
+ * style-first helper around `workbenchCompile`.
+ * @description
+ * Convenience wrapper for older host scripts that primarily compile styles. It returns the style result at the top level and includes an optional `demos` registry section when `demoInputDir` is provided.
+ * @example
+ * ```ts
+ * const result = await compileWorkbenchStyles({
+ *   inputDir: "titans_rc/styles/scss",
+ *   outputDir: "src/styles/workbench-css",
+ *   demoInputDir: "src/components/pages",
+ * });
+ * ```
+ */
 export async function compileWorkbenchStyles(
   options: CompileWorkbenchStylesOptions,
 ): Promise<CompileWorkbenchStylesResult> {

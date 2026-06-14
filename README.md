@@ -1,4 +1,4 @@
-# demo-workbench
+![logo](https://raw.githubusercontent.com/voodoofugu/demo-workbench/refs/heads/main/src/assets/banner-logo.png)
 
 <h2></h2>
 
@@ -102,6 +102,7 @@ function DemoWorkbench(props: DemoWorkbenchProps): JSX.Element;
 - `demoLoader?: (name: string) => Promise<DemoModule>` - async loader for generated demo names.
 - `styleLoader?: (name: string) => Promise<unknown>` - dynamic style loader used by `styled-atom`.
 - `styleReloadUrl?: string | false` - optional dev-only SSE URL used to reload mounted style atoms after watch rebuilds.
+- `styleReloadManifestUrl?: string | false` - optional generated manifest URL that auto-enables style reload while the watch script is running.
 - `baseCssFiles?: string[]` - host-level CSS atoms loaded by the shell.
 - `baseCssLayer?: string` - cascade layer for host CSS.
 - `baseCss?: string` - raw host CSS injected once before `baseCssFiles` in the same layer.
@@ -298,12 +299,33 @@ Starts with one full compile. After that, direct changes to one top-level style 
 </em><br />
 
 <b>Return:</b><br />
-Returns a watcher handle with `close()` for cleanup.
+Returns a watcher handle with `styleReloadUrl` when dev reload is enabled and `close()` for cleanup.
 
 ```ts
 const watch = await watchWorkbenchCompile(options);
+console.log(watch.styleReloadUrl);
 await watch.close();
 ```
+
+</div></ul></details>
+
+<h2></h2>
+
+<details><summary><b><code>getWorkbenchCompileWatchPaths</code></b>: <em>derive default watch paths from compile options</em></summary><br /><ul><div>
+
+<b>Usage:</b><br />
+
+```ts
+import { getWorkbenchCompileWatchPaths } from "demo-workbench/node";
+
+const watchPaths = getWorkbenchCompileWatchPaths(options, [
+  "src/components/popups",
+]);
+```
+
+<b>Description:</b><em><br />
+Returns the style input directory, demo input directory and any extra host paths as a compact string list. Use it when a host script wants to print or extend the same watch surface that <code>watchWorkbenchCompile</code> uses internally.
+</em><br />
 
 </div></ul></details>
 
@@ -362,9 +384,13 @@ npm run build
 <DemoWorkbench
   demos={demos}
   styleLoader={(name) => import(`../styles/${name}.css`)}
-  styleReloadUrl="http://127.0.0.1:38297/demo-workbench-style-events"
+  styleReloadManifestUrl="/workbench-css/demo-workbench-style-reload.json"
   baseCssFiles={["output", "theme"]}
-  baseCss={`[workbench-scope] { min-height: 100%; }`}
+  baseCss={`
+    [workbench-scope] {
+      min-height: 100%;
+    }
+  `}
 />
 ```
 
@@ -384,16 +410,43 @@ const options = {
 };
 
 await workbenchCompile(options);
-await watchWorkbenchCompile({
+const watch = await watchWorkbenchCompile({
   ...options,
+  styleReload: true,
   onBuild: (result) => {
     if (result.styles) console.log("styles", result.styles.files.length);
     if (result.demos) console.log("demos", result.demos.names.length);
   },
 });
+
+console.log(watch.styleReloadUrl);
 ```
 
 Host projects should pass their paths/options only; file watching, debouncing and rebuild calls are owned by `demo-workbench/node`.
+
+</details>
+
+<details><summary><b>Style reload manifest</b>: <em>let the browser discover the active watch server</em></summary><br />
+
+```ts
+await watchWorkbenchCompile({
+  styles: {
+    inputDir: "titans_rc/styles/scss",
+    outputDir: "src/styles/workbench-css",
+  },
+  styleReload: true,
+});
+```
+
+```tsx
+<DemoWorkbench
+  demos={demos}
+  styleLoader={(name) => import(`./workbench-css/${name}.css`)}
+  styleReloadManifestUrl="/workbench-css/demo-workbench-style-reload.json"
+/>
+```
+
+`watchWorkbenchCompile` writes `demo-workbench-style-reload.json` into the style output directory. The browser polls that file and only connects to the reload stream while the watch script is alive.
 
 </details>
 

@@ -2,28 +2,66 @@ import { mkdir, readdir, writeFile } from "node:fs/promises";
 import type { Dirent } from "node:fs";
 import path from "node:path";
 
+/**---
+ * ## ![logo](https://github.com/voodoofugu/demo-workbench/raw/main/src/assets/demo-workbench-logo.png)
+ * ### ***WorkbenchFileNameDiscoveryOptions***:
+ * options for reading sorted workbench file basenames from a directory.
+ * @description
+ * Used by `discoverWorkbenchFileNames`, registry generation and host scripts that need the same file filtering rules as `demo-workbench`.
+ * @example
+ * ```ts
+ * const options: WorkbenchFileNameDiscoveryOptions = {
+ *   inputDir: "src/components/pages",
+ *   exclude: ["Template"],
+ * };
+ * ```
+ */
 export type WorkbenchFileNameDiscoveryOptions = {
   inputDir: string;
   extensions?: string[];
   exclude?: string[];
 };
 
+/**---
+ * ## ![logo](https://github.com/voodoofugu/demo-workbench/raw/main/src/assets/demo-workbench-logo.png)
+ * ### ***GenerateNameListOptions***:
+ * options for writing discovered names to a JS or JSON file.
+ * @description
+ * Extends file discovery options with an output file and optional export name for generated JavaScript modules.
+ */
 export type GenerateNameListOptions = WorkbenchFileNameDiscoveryOptions & {
   outputFile: string;
   exportName?: string;
 };
 
+/**---
+ * ## ![logo](https://github.com/voodoofugu/demo-workbench/raw/main/src/assets/demo-workbench-logo.png)
+ * ### ***GenerateNameListResult***:
+ * result returned after a generated name list is written.
+ */
 export type GenerateNameListResult = {
   inputDir: string;
   outputFile: string;
   names: string[];
 };
 
+/**---
+ * ## ![logo](https://github.com/voodoofugu/demo-workbench/raw/main/src/assets/demo-workbench-logo.png)
+ * ### ***GenerateDemoManifestOptions***:
+ * options for writing a lazy demo manifest module.
+ * @description
+ * The generated manifest contains `{ name, load }` entries where `load` imports from `importPathPrefix`.
+ */
 export type GenerateDemoManifestOptions = WorkbenchFileNameDiscoveryOptions & {
   outputFile: string;
   importPathPrefix?: string;
 };
 
+/**---
+ * ## ![logo](https://github.com/voodoofugu/demo-workbench/raw/main/src/assets/demo-workbench-logo.png)
+ * ### ***GenerateDemoManifestResult***:
+ * result returned after a lazy demo manifest is written.
+ */
 export type GenerateDemoManifestResult = {
   inputDir: string;
   outputFile: string;
@@ -62,6 +100,19 @@ function isWorkbenchEntryFile(entry: Dirent, extensions: Set<string>, exclude: S
   return !exclude.has(name);
 }
 
+/**---
+ * ## ![logo](https://github.com/voodoofugu/demo-workbench/raw/main/src/assets/demo-workbench-logo.png)
+ * ### ***discoverWorkbenchFileNames***:
+ * read sorted workbench file basenames from one directory.
+ * @description
+ * Includes `.jsx`, `.tsx`, `.js` and `.ts` by default, while ignoring dotfiles, `.d.ts`, `_` files, `a_` files and explicitly excluded basenames.
+ * @example
+ * ```ts
+ * const names = await discoverWorkbenchFileNames({
+ *   inputDir: "src/components/pages",
+ * });
+ * ```
+ */
 export async function discoverWorkbenchFileNames(options: WorkbenchFileNameDiscoveryOptions) {
   const inputDir = path.resolve(options.inputDir);
   const extensions = normalizeExtensions(options.extensions);
@@ -106,6 +157,13 @@ function renderNameList(names: string[], outputFile: string, exportName = "names
   ].join("\n");
 }
 
+/**---
+ * ## ![logo](https://github.com/voodoofugu/demo-workbench/raw/main/src/assets/demo-workbench-logo.png)
+ * ### ***generateNameList***:
+ * discover file basenames and write them to a JS or JSON file.
+ * @description
+ * Internal helper used by demo registry generation and useful for scripts that need a plain generated name list.
+ */
 export async function generateNameList(
   options: GenerateNameListOptions,
 ): Promise<GenerateNameListResult> {
@@ -120,6 +178,13 @@ export async function generateNameList(
   return { inputDir, outputFile, names };
 }
 
+/**---
+ * ## ![logo](https://github.com/voodoofugu/demo-workbench/raw/main/src/assets/demo-workbench-logo.png)
+ * ### ***generateDemoManifest***:
+ * discover demo files and write a lazy manifest module.
+ * @description
+ * Generated entries keep a stable name and a lazy `load` function for each discovered demo file.
+ */
 export async function generateDemoManifest(
   options: GenerateDemoManifestOptions,
 ): Promise<GenerateDemoManifestResult> {

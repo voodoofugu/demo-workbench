@@ -17,6 +17,7 @@ export type {
   WorkbenchCompileStylesResult,
   WorkbenchCompileWatchOptions,
   WorkbenchCompileWatchResult,
+  WorkbenchStyleReloadOptions,
   WorkbenchStyleReloadManifest,
 } from "./workbenchCompile";
 export { discoverWorkbenchFileNames } from "./generateDemoManifest";
