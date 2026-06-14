@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { useMemo, useRef } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import nexus, { type WorkbenchState, type WorkbenchStateUpdate } from "./nexus";
 import generatedWorkbenchRegistry from "./generatedWorkbenchRegistry";
@@ -13,6 +13,9 @@ export function WorkbenchStateProvider({
   children: ReactNode;
 }) {
   const appliedInitialStateKeyRef = useRef<string | null>(null);
+  const [appliedInitialStateKey, setAppliedInitialStateKey] = useState<
+    string | null
+  >(null);
   const resolvedInitialState = useMemo(
     () => ({
       fileRegistry: generatedWorkbenchRegistry,
@@ -22,10 +25,18 @@ export function WorkbenchStateProvider({
   );
   const resolvedInitialStateKey = JSON.stringify(resolvedInitialState);
 
-  if (appliedInitialStateKeyRef.current !== resolvedInitialStateKey) {
+  useLayoutEffect(() => {
+    if (appliedInitialStateKeyRef.current === resolvedInitialStateKey) {
+      setAppliedInitialStateKey(resolvedInitialStateKey);
+      return;
+    }
+
     appliedInitialStateKeyRef.current = resolvedInitialStateKey;
     nexus.set(resolvedInitialState);
-  }
+    setAppliedInitialStateKey(resolvedInitialStateKey);
+  }, [resolvedInitialState, resolvedInitialStateKey]);
+
+  if (appliedInitialStateKey !== resolvedInitialStateKey) return null;
 
   return children;
 }
@@ -49,5 +60,3 @@ export function useWorkbenchValue<Key extends keyof WorkbenchState>(
 export function useWorkbenchActions(): (state: WorkbenchStateUpdate) => void {
   return useMemo(() => nexus.set.bind(nexus), []);
 }
-
-export { nexus };

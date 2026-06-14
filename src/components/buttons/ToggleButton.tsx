@@ -1,17 +1,15 @@
 import { useEffect, useRef } from "react";
 
-import {
-  useWorkbenchActions,
-  useWorkbenchValue,
-} from "../../state/WorkbenchState";
+import nexus from "../../state/nexus";
 
 export default function ToggleButton() {
-  const theme = useWorkbenchValue("darkTheme") as boolean;
-  const setWorkbenchState = useWorkbenchActions();
+  const theme = nexus.use("darkTheme") as boolean;
   const templateMainRef = useRef<HTMLElement | null>(null);
 
   const handleClick = () => {
-    setWorkbenchState((prev) => ({ darkTheme: !prev.darkTheme }));
+    nexus.set((prev: { darkTheme: boolean }) => ({
+      darkTheme: !prev.darkTheme,
+    }));
   };
 
   useEffect(() => {

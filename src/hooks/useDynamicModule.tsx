@@ -2,11 +2,22 @@ import { useEffect, useState } from "react";
 
 type ImportModuleT = () => Promise<Record<string, any>>;
 
-const useDynamicModule = (name: string, importModule?: ImportModuleT) => {
+const useDynamicModule = (
+  name: string,
+  importModule?: ImportModuleT,
+  options: { enabled?: boolean } = {},
+) => {
   const [module, setModule] = useState<null | Record<string, any>>(null);
+  const enabled = options.enabled ?? true;
 
   useEffect(() => {
     let isActive = true;
+
+    if (!enabled) {
+      return () => {
+        isActive = false;
+      };
+    }
 
     if (!name || !importModule) {
       setModule(null);
@@ -31,7 +42,7 @@ const useDynamicModule = (name: string, importModule?: ImportModuleT) => {
     return () => {
       isActive = false;
     };
-  }, [name, importModule]);
+  }, [enabled, name, importModule]);
 
   return module;
 };

@@ -1,12 +1,11 @@
 import { memo, useEffect, useRef } from "react";
 import type { ComponentType } from "react";
 
-import {
-  useWorkbenchActions,
-  useWorkbenchValue,
-} from "../state/WorkbenchState";
 import WorkbenchLayout from "./WorkbenchLayout";
 import DemoGrid from "../components/DemoGrid";
+
+import nexus from "../state/nexus";
+
 import type {
   DemoItem,
   DemoWorkbenchProps,
@@ -19,7 +18,6 @@ type WorkbenchShellProps = {
   viewport: DemoWorkbenchViewport;
   renderDemoContent?: DemoWorkbenchProps["renderDemoContent"];
   bodyBg?: DemoWorkbenchProps["bodyBg"];
-  bodySelectorReplacement?: DemoWorkbenchProps["bodySelectorReplacement"];
   notFoundComponent?: ComponentType | undefined;
 };
 
@@ -29,11 +27,9 @@ export default memo(function WorkbenchShell({
   viewport,
   renderDemoContent,
   bodyBg,
-  bodySelectorReplacement,
   notFoundComponent,
 }: WorkbenchShellProps) {
-  const setWorkbenchState = useWorkbenchActions();
-  const theme = useWorkbenchValue("darkTheme") as boolean;
+  const theme = nexus.use("darkTheme") as boolean;
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -51,14 +47,14 @@ export default memo(function WorkbenchShell({
           : 0;
       const scales = [widthScale, heightScale].filter((value) => value > 0);
 
-      setWorkbenchState({
+      nexus.set({
         windowScale: scales.length > 0 ? Math.min(...scales) : 0,
       });
     });
 
     observer.observe(rootRef.current);
     return () => observer.disconnect();
-  }, [setWorkbenchState, viewport.height, viewport.width]);
+  }, [viewport.height, viewport.width]);
 
   return (
     <div
@@ -71,7 +67,6 @@ export default memo(function WorkbenchShell({
           demos={demos}
           renderDemoContent={renderDemoContent as any}
           bodyBg={bodyBg}
-          bodySelectorReplacement={bodySelectorReplacement}
           notFoundComponent={notFoundComponent}
         />
       </WorkbenchLayout>

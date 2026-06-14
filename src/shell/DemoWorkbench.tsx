@@ -1,8 +1,13 @@
 import type { ComponentType } from "react";
-import { useCallback, useEffect, useMemo, useRef } from "react";
-import { StyleCore, StyledAtom } from "styled-atom";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type {
+  ImportStyleResultT,
+  ImportStyleT,
+  StyleAtomCssReplacementT,
+} from "styled-atom";
 
 import workbenchCss from "../styles/workbenchCss";
+import { StyledAtom, workbenchStyleAtoms } from "../styles/styledAtom";
 import RawWorkbenchStorage from "../state/WorkbenchStorage";
 import generatedWorkbenchRegistry from "../state/generatedWorkbenchRegistry";
 import { WorkbenchStateProvider } from "../state/WorkbenchState";
@@ -21,10 +26,6 @@ import type {
 
 const WORKBENCH_STYLE_ATOM = "workbench";
 
-const TypedStyleCore = StyleCore as ComponentType<{
-  path: (fileName: string) => Promise<unknown>;
-}>;
-
 const TypedWorkbenchStorage = RawWorkbenchStorage as ComponentType<{
   storageData: DemoWorkbenchStorageEntry[];
 }>;
@@ -35,7 +36,6 @@ const TypedWorkbenchShell = RawWorkbenchShell as ComponentType<{
   viewport: DemoWorkbenchViewport;
   renderDemoContent: DemoWorkbenchProps["renderDemoContent"];
   bodyBg: DemoWorkbenchProps["bodyBg"];
-  bodySelectorReplacement: DemoWorkbenchProps["bodySelectorReplacement"];
   notFoundComponent: DemoWorkbenchProps["notFoundComponent"];
 }>;
 
@@ -51,9 +51,96 @@ const defaultStorageData: DemoWorkbenchStorageEntry[] = [
 
 const defaultViewport: DemoWorkbenchViewport = { width: 1200, height: 640 };
 const emptyCssLoader = () => Promise.resolve();
+const STYLE_RELOAD_MANIFEST_POLL_MS = 2000;
 
-function WorkbenchGlobalStyles({ fileNames }: { fileNames: string[] }) {
-  return <StyledAtom fileNames={fileNames} />;
+function readStyleReloadFileNames(event: MessageEvent) {
+  try {
+    const data = JSON.parse(String(event.data)) as { fileNames?: unknown };
+    return Array.isArray(data.fileNames)
+      ? data.fileNames.filter(
+          (fileName): fileName is string => typeof fileName === "string",
+        )
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function getStyleReloadCssUrl(styleReloadUrl: string, fileName: string) {
+  const url = new URL(styleReloadUrl, window.location.href);
+  url.searchParams.set("style", fileName);
+  url.searchParams.set("v", String(Date.now()));
+  return url.toString();
+}
+
+async function loadStyleFromReloadServer(
+  styleReloadUrl: string,
+  fileName: string,
+) {
+  const response = await fetch(getStyleReloadCssUrl(styleReloadUrl, fileName), {
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to load workbench style "${fileName}"`);
+  }
+
+  return response.text();
+}
+
+async function loadStyleReplacements(
+  styleReloadUrl: string,
+  fileNames: readonly string[],
+): Promise<StyleAtomCssReplacementT[]> {
+  return Promise.all(
+    fileNames.map(async (fileName) => ({
+      fileName,
+      css: await loadStyleFromReloadServer(styleReloadUrl, fileName),
+    })),
+  );
+}
+
+async function loadStyleReloadUrlFromManifest(manifestUrl: string) {
+  const response = await fetch(manifestUrl, { cache: "no-store" });
+
+  if (!response.ok) return undefined;
+
+  const manifest = (await response.json()) as {
+    enabled?: unknown;
+    styleReloadUrl?: unknown;
+  };
+
+  return manifest.enabled === true && typeof manifest.styleReloadUrl === "string"
+    ? manifest.styleReloadUrl
+    : undefined;
+}
+
+function WorkbenchGlobalStyles({
+  hostFileNames,
+  baseCss,
+  baseCssLayer,
+}: {
+  hostFileNames: string[];
+  baseCss?: string;
+  baseCssLayer?: string;
+}) {
+  return (
+    <>
+      <StyledAtom
+        fileNames={[WORKBENCH_STYLE_ATOM]}
+        layer="workbench"
+        encap={{ content: false }}
+      />
+      {baseCss ? <StyledAtom layer={baseCssLayer} css={baseCss} /> : null}
+      {hostFileNames.length ? (
+        <StyledAtom
+          fileNames={hostFileNames}
+          layer={baseCssLayer}
+          encap={{ content: false }}
+        />
+      ) : null}
+    </>
+  );
 }
 
 /**
@@ -67,37 +154,145 @@ export default function DemoWorkbench({
   demos,
   demoLoader,
   styleLoader,
+  styleReloadUrl,
+  styleReloadManifestUrl,
   baseCssFiles,
+  baseCssLayer,
+  baseCss,
   storageData = defaultStorageData,
   viewport = defaultViewport,
   initialState,
   renderDemoContent,
   bodyBg,
-  bodySelectorReplacement,
   notFoundComponent,
 }: DemoWorkbenchProps) {
   const resolvedStyleLoader: (name: string) => Promise<unknown> =
     styleLoader ?? emptyCssLoader;
+  const [manifestStyleReloadUrl, setManifestStyleReloadUrl] = useState<
+    string | undefined
+  >();
+  const directStyleReloadUrl =
+    styleReloadUrl === false ? undefined : styleReloadUrl;
+  const resolvedStyleReloadUrl =
+    styleReloadUrl === undefined ? manifestStyleReloadUrl : directStyleReloadUrl;
   const styleLoaderRef = useRef(resolvedStyleLoader);
+  const styleReloadUrlRef = useRef(resolvedStyleReloadUrl);
 
   useEffect(() => {
     styleLoaderRef.current = resolvedStyleLoader;
   }, [resolvedStyleLoader]);
 
-  const loadStyle = useCallback((fileName: string) => {
+  useEffect(() => {
+    styleReloadUrlRef.current = resolvedStyleReloadUrl;
+  }, [resolvedStyleReloadUrl]);
+
+  useEffect(() => {
+    if (
+      styleReloadUrl !== undefined ||
+      !styleReloadManifestUrl ||
+      typeof window === "undefined"
+    ) {
+      setManifestStyleReloadUrl(undefined);
+      return;
+    }
+
+    let isActive = true;
+    const resolvedManifestUrl = new URL(
+      styleReloadManifestUrl,
+      window.location.href,
+    ).toString();
+
+    const readManifest = () => {
+      loadStyleReloadUrlFromManifest(resolvedManifestUrl)
+        .then((nextUrl) => {
+          if (!isActive) return;
+          setManifestStyleReloadUrl((currentUrl) =>
+            currentUrl === nextUrl ? currentUrl : nextUrl,
+          );
+        })
+        .catch(() => {
+          if (isActive) {
+            setManifestStyleReloadUrl(undefined);
+          }
+        });
+    };
+
+    readManifest();
+    const interval = window.setInterval(
+      readManifest,
+      STYLE_RELOAD_MANIFEST_POLL_MS,
+    );
+
+    return () => {
+      isActive = false;
+      window.clearInterval(interval);
+    };
+  }, [styleReloadManifestUrl, styleReloadUrl]);
+
+  const loadStyle = useCallback<ImportStyleT>(async (fileName: string) => {
     if (fileName === WORKBENCH_STYLE_ATOM) {
       return Promise.resolve({ default: workbenchCss });
     }
 
-    return styleLoaderRef.current(fileName);
+    const reloadUrl = styleReloadUrlRef.current;
+    if (reloadUrl) {
+      try {
+        return await loadStyleFromReloadServer(reloadUrl, fileName);
+      } catch {
+        // Fall back to the host loader when the dev reload server is not alive.
+      }
+    }
+
+    return (await styleLoaderRef.current(fileName)) as ImportStyleResultT;
   }, []);
+
+  useEffect(() => {
+    workbenchStyleAtoms.configure({
+      path: loadStyle,
+      layers: baseCssLayer ? ["workbench", baseCssLayer] : ["workbench"],
+    });
+  }, [baseCssLayer, loadStyle]);
+
+  useEffect(() => {
+    if (
+      !resolvedStyleReloadUrl ||
+      typeof window === "undefined" ||
+      typeof window.EventSource === "undefined"
+    ) {
+      return;
+    }
+
+    const source = new window.EventSource(resolvedStyleReloadUrl);
+    let isActive = true;
+    const reloadStyles = (event: MessageEvent) => {
+      const fileNames = readStyleReloadFileNames(event);
+
+      if (!fileNames?.length) return;
+
+      loadStyleReplacements(resolvedStyleReloadUrl, fileNames)
+        .then((styles) => {
+          if (isActive) {
+            workbenchStyleAtoms.replace(styles);
+          }
+        })
+        .catch(() => {
+          if (isActive) {
+            workbenchStyleAtoms.reload(fileNames);
+          }
+        });
+    };
+
+    source.addEventListener("styles", reloadStyles as EventListener);
+
+    return () => {
+      isActive = false;
+      source.removeEventListener("styles", reloadStyles as EventListener);
+      source.close();
+    };
+  }, [resolvedStyleReloadUrl]);
 
   const rawHostCssFiles = baseCssFiles ?? ["output"];
   const hostCssFiles = useStableStringList(rawHostCssFiles);
-  const orderedCssFiles = useStableStringList([
-    WORKBENCH_STYLE_ATOM,
-    ...hostCssFiles,
-  ]);
 
   const registryDemos = useMemo(
     () =>
@@ -136,13 +331,19 @@ export default function DemoWorkbench({
       delete nextInitialState.windowScale;
     }
 
-    return nextInitialState;
-  }, [initialState, storageData]);
+    return {
+      ...nextInitialState,
+      baseCssFiles: hostCssFiles,
+    } as DemoWorkbenchInitialState;
+  }, [hostCssFiles, initialState, storageData]);
 
   return (
     <WorkbenchStateProvider initialState={restoredInitialState}>
-      <TypedStyleCore path={loadStyle} />
-      <WorkbenchGlobalStyles fileNames={orderedCssFiles} />
+      <WorkbenchGlobalStyles
+        hostFileNames={hostCssFiles}
+        baseCss={baseCss}
+        baseCssLayer={baseCssLayer}
+      />
       <WorkbenchTitle title={title} />
       <TypedWorkbenchStorage storageData={storageData} />
       <TypedWorkbenchShell
@@ -151,7 +352,6 @@ export default function DemoWorkbench({
         viewport={viewport}
         renderDemoContent={renderDemoContent}
         bodyBg={bodyBg}
-        bodySelectorReplacement={bodySelectorReplacement}
         notFoundComponent={notFoundComponent}
       />
     </WorkbenchStateProvider>

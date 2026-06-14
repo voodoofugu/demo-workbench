@@ -26,6 +26,7 @@ export type WorkbenchState = {
   scrollTop: number | false;
   windowScale: number | null;
   baseCssFiles: string[];
+  workbenchScope: string;
 };
 
 export type WorkbenchStateUpdate =
@@ -57,6 +58,7 @@ const nexus: nexus = createReactNexus<WorkbenchState>({
     scrollTop: 0,
     windowScale: null,
     baseCssFiles: [],
+    workbenchScope: "[workbench-scope]",
   },
 });
 

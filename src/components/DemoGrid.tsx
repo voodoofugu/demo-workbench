@@ -31,7 +31,6 @@ type DemoGridProps = {
   showContent?: boolean;
   pageClassName?: string;
   bodyBg?: string;
-  bodySelectorReplacement?: string;
   renderDemoContent?: (pageName: string) => ReactNode;
   notFoundComponent?: ComponentType | undefined;
 };
@@ -43,13 +42,15 @@ const DemoGrid = memo(function DemoGrid({
   showContent,
   pageClassName,
   bodyBg,
-  bodySelectorReplacement,
   renderDemoContent,
   notFoundComponent: NotFoundComponent,
 }: DemoGridProps) {
   const { state, setWorkbenchState } = useWorkbenchStore();
 
   const [isScrolling, setIsScrolling] = useState<boolean>(false);
+  const [loadedDemoNames, setLoadedDemoNames] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [pagePosition, setPagePosition] = useState<PositionData>({
     scrollTop: 0,
     top: 0,
@@ -109,6 +110,30 @@ const DemoGrid = memo(function DemoGrid({
       demos.find((demo) => (demo.name ?? demo.title) === activePage) ?? null,
     [activePage, demos],
   );
+
+  useEffect(() => {
+    const demoNames = new Set(
+      demos.map((demo) => demo.name ?? demo.title).filter(Boolean),
+    );
+
+    setLoadedDemoNames((prev) => {
+      const next = new Set(
+        Array.from(prev).filter((demoName) => demoNames.has(demoName)),
+      );
+
+      return next.size === prev.size ? prev : next;
+    });
+  }, [demos]);
+
+  const markDemoLoaded = useCallback((demoName: string) => {
+    setLoadedDemoNames((prev) => {
+      if (prev.has(demoName)) return prev;
+
+      const next = new Set(prev);
+      next.add(demoName);
+      return next;
+    });
+  }, []);
 
   useLayoutEffect(() => {
     if (!hashState) return;
@@ -249,19 +274,24 @@ const DemoGrid = memo(function DemoGrid({
     }));
   }, []);
 
-  const components = usedDemos.map((demo, index) => (
-    <DemoCell
-      key={demo.name ?? demo.title ?? index}
-      demo={demo}
-      isOpen={activePage === (demo.name ?? demo.title)}
-      onOpen={openDemo}
-      renderDemoContent={renderDemoContent}
-      bodySelectorReplacement={bodySelectorReplacement}
-      isScrolling={isScrolling}
-      scrollTop={savedScrollTop}
-      searchText={searchText}
-    />
-  ));
+  const components = usedDemos.map((demo, index) => {
+    const demoName = demo.name ?? demo.title ?? String(index);
+
+    return (
+      <DemoCell
+        key={demoName}
+        demo={demo}
+        isOpen={activePage === demoName}
+        onOpen={openDemo}
+        onLoad={markDemoLoaded}
+        renderDemoContent={renderDemoContent}
+        isDemoLoaded={loadedDemoNames.has(demoName)}
+        isScrolling={isScrolling}
+        scrollTop={savedScrollTop}
+        searchText={searchText}
+      />
+    );
+  });
 
   const pageOverlay =
     activeDemo && typeof document !== "undefined"
@@ -287,8 +317,9 @@ const DemoGrid = memo(function DemoGrid({
               showContent={showContent}
               onClose={closeDemo}
               onOpen={openDemo}
+              onLoad={markDemoLoaded}
+              isDemoLoaded={loadedDemoNames.has(activePage)}
               renderDemoContent={renderDemoContent}
-              bodySelectorReplacement={bodySelectorReplacement}
             />
           </div>,
           document.querySelector("#templateBody") ?? document.body,

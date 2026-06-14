@@ -18,7 +18,7 @@ type TooltipData = {
   positionClassY?: string;
 };
 
-export function addTooltipData(
+function addTooltipData(
   event: MouseEvent,
   setTooltipData: Dispatch<SetStateAction<TooltipData | null>>,
   render: boolean,
@@ -49,14 +49,14 @@ export function addTooltipData(
     if (position === "top") {
       newTooltipData.top = top;
       newTooltipData.positionClassY =
-        "after:border-t-8 after:border-t-indigo-200 dark:after:border-t-indigo-900 after:bottom-[-7px] -translate-y-full mt-[-8px]";
+        "after:border-t-8 after:border-t-indigo-200 dark:after:border-t-indigo-900 after:bottom-[-7px] -translate-y-full mt-[-10px]";
       newTooltipData.left = centerX;
       newTooltipData.positionClassX =
         "after:left-1/2 after:-translate-x-1/2 -translate-x-1/2";
     } else if (position === "bottom") {
       newTooltipData.top = top + height;
       newTooltipData.positionClassY =
-        "after:border-b-8 after:border-b-indigo-50 dark:after:border-b-indigo-600 after:top-[-7px] mt-[8px]";
+        "after:border-b-8 after:border-b-indigo-50 dark:after:border-b-indigo-600 after:top-[-7px] mt-[10px]";
       newTooltipData.left = centerX;
       newTooltipData.positionClassX =
         "after:left-1/2 after:-translate-x-1/2 -translate-x-1/2";
@@ -65,24 +65,24 @@ export function addTooltipData(
       newTooltipData.positionClassY =
         "after:border-t-8 after:border-t-indigo-50 dark:after:border-t-indigo-700 after:inset-y-1/2 after:-translate-y-1/2 after:rotate-90 -translate-y-1/2";
       newTooltipData.left = left + width;
-      newTooltipData.positionClassX = "after:left-[-11px] ml-[8px]";
+      newTooltipData.positionClassX = "after:left-[-11px] ml-[10px]";
     } else if (position === "right") {
       newTooltipData.top = centerY;
       newTooltipData.positionClassY =
         "after:border-b-8 after:border-b-indigo-200 dark:after:border-b-indigo-900 after:inset-y-1/2 after:-translate-y-1/2 after:rotate-90 -translate-y-1/2";
       newTooltipData.left = left;
       newTooltipData.positionClassX =
-        "after:right-[-11px] -translate-x-full ml-[-8px]";
+        "after:right-[-11px] -translate-x-full ml-[-10px]";
     }
   } else {
     if (centerY < halfHeight) {
       newTooltipData.top = top + height;
       newTooltipData.positionClassY =
-        "after:border-b-8 after:border-b-indigo-50 dark:after:border-b-indigo-600 after:top-[-7px] mt-[8px]";
+        "after:border-b-8 after:border-b-indigo-50 dark:after:border-b-indigo-600 after:top-[-7px] mt-[10px]";
     } else {
       newTooltipData.top = top;
       newTooltipData.positionClassY =
-        "after:border-t-8 after:border-t-indigo-200 dark:after:border-t-indigo-900 after:bottom-[-7px] -translate-y-full mt-[-8px]";
+        "after:border-t-8 after:border-t-indigo-200 dark:after:border-t-indigo-900 after:bottom-[-7px] -translate-y-full mt-[-10px]";
     }
 
     if (centerX < oneThirdWidth) {
@@ -105,7 +105,7 @@ export function addTooltipData(
   }, 100);
   window.setTimeout(() => {
     setVisible(true);
-  }, 300);
+  }, 1000);
 }
 
 export function removeTooltipData(
@@ -127,13 +127,15 @@ export default function Tooltip({ children, text, position }: TooltipProps) {
 
   const portalTarget =
     typeof document !== "undefined"
-      ? document.querySelector("#templateBody > main") ??
+      ? (document.querySelector("#templateBody > main") ??
         document.querySelector("#templateBody") ??
-        document.body
+        document.body)
       : null;
 
   return (
     <div
+      tooltip-layer=""
+      className="w-full h-full"
       onMouseEnter={(event) =>
         addTooltipData(
           event,
@@ -158,7 +160,9 @@ export default function Tooltip({ children, text, position }: TooltipProps) {
                   ? `${tooltipData.positionClassY} after:border-x-8 after:border-x-transparent`
                   : "m-0"
               } ${tooltipData?.positionClassX ?? ""} ${
-                visible ? "opacity-100 scale-100" : "opacity-0 scale-90 mt-[0px]"
+                visible
+                  ? "opacity-100 scale-100"
+                  : "opacity-0 scale-90 mt-[0px]"
               }`}
               style={{
                 top: tooltipData?.top,

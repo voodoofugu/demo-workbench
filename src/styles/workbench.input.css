@@ -2,13 +2,17 @@
 @tailwind components;
 @tailwind utilities;
 
-.templateScroll .ms-object-box {
+.templateScroll
+  > .ms-content
+  > .ms-element
+  > .ms-objects-wrapper
+  > .ms-object-box {
   opacity: var(--content-visibility);
   transition: transform 0.2s ease-in-out;
   filter: grayscale(calc(1 - var(--content-visibility)))
     blur(calc((1 - var(--content-visibility)) * 2px));
 }
 
-.templateScroll .ms-bar {
-  right: 30px;
+.templateScroll > .ms-content > .ms-bar {
+  translate: -40px 0;
 }

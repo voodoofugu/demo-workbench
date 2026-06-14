@@ -7,15 +7,11 @@ import {
   useDeferredValue,
 } from "react";
 
-import {
-  useWorkbenchActions,
-  useWorkbenchValue,
-} from "../state/WorkbenchState";
+import nexus from "../state/nexus";
 import type { DemoItem } from "../types/public";
 
 export default function SearchControl({ demos = [] }: { demos?: DemoItem[] }) {
-  const searchText = (useWorkbenchValue("searchText") as string) || "";
-  const setWorkbenchState = useWorkbenchActions();
+  const searchText = nexus.use("searchText") as string;
   const [focus, setFocus] = useState(false);
 
   const clearBtnRef = useRef<HTMLButtonElement | null>(null);
@@ -50,13 +46,13 @@ export default function SearchControl({ demos = [] }: { demos?: DemoItem[] }) {
           (value, index) => value === prevFilteredValueRef.current[index],
         )
       ) {
-        setWorkbenchState({
+        nexus.set({
           searchData: filteredData.length > 0 ? filteredData : null,
         });
         prevFilteredValueRef.current = filteredData;
       }
     },
-    [demos, setWorkbenchState],
+    [demos],
   );
 
   const handleFocus = () => {
@@ -68,7 +64,7 @@ export default function SearchControl({ demos = [] }: { demos?: DemoItem[] }) {
   };
 
   const handleClear = () => {
-    setWorkbenchState({ searchText: "" });
+    nexus.set({ searchText: "" });
     inputFocus();
   };
 
@@ -118,9 +114,7 @@ export default function SearchControl({ demos = [] }: { demos?: DemoItem[] }) {
         placeholder="Search"
         value={deferredSearchText}
         onChange={(event) =>
-          startTransition(() =>
-            setWorkbenchState({ searchText: event.target.value }),
-          )
+          startTransition(() => nexus.set({ searchText: event.target.value }))
         }
         autoComplete="off"
       />

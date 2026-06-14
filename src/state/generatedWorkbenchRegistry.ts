@@ -94,7 +94,7 @@ export const generatedWorkbenchRegistry: WorkbenchFileRegistry = {
     "V2Unipop20Pse2Pop",
     "V2Unipop20PsePop",
     "V2Unipop20SexpedPop",
-    "V2Unipop20Starterpack",
+    "V2Unipop20Starterpack"
   ],
 };
 

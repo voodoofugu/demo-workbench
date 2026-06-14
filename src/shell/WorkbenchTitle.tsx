@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import type { ReactNode } from "react";
 
-import { useWorkbenchValue } from "../state/WorkbenchState";
+import nexus from "../state/nexus";
 
 export default function WorkbenchTitle({
   title = "Template",
@@ -9,7 +9,7 @@ export default function WorkbenchTitle({
   title?: string;
   children?: ReactNode;
 }) {
-  const activePage = useWorkbenchValue("activePage") as string | undefined;
+  const activePage = nexus.use("activePage") as string | undefined;
 
   useEffect(() => {
     document.title = `${activePage || title}`;

@@ -1,6 +1,7 @@
 export {
   compileWorkbenchStyles,
   getWorkbenchCompileWatchPaths,
+  WORKBENCH_STYLE_RELOAD_MANIFEST_FILE,
   watchWorkbenchCompile,
   workbenchCompile,
 } from "./workbenchCompile";
@@ -16,10 +17,7 @@ export type {
   WorkbenchCompileStylesResult,
   WorkbenchCompileWatchOptions,
   WorkbenchCompileWatchResult,
+  WorkbenchStyleReloadManifest,
 } from "./workbenchCompile";
-export {
-  discoverWorkbenchFileNames,
-} from "./generateDemoManifest";
-export type {
-  WorkbenchFileNameDiscoveryOptions,
-} from "./generateDemoManifest";
+export { discoverWorkbenchFileNames } from "./generateDemoManifest";
+export type { WorkbenchFileNameDiscoveryOptions } from "./generateDemoManifest";

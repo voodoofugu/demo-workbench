@@ -1,5 +1,8 @@
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import type { Dirent } from "node:fs";
+import { createServer } from "node:http";
+import type { Server, ServerResponse } from "node:http";
+import type { AddressInfo } from "node:net";
 import chokidar from "chokidar";
 import type { FSWatcher } from "chokidar";
 import path from "node:path";
@@ -7,6 +10,7 @@ import { transform } from "lightningcss";
 import * as sass from "sass-embedded";
 
 import { discoverWorkbenchFileNames } from "./generateDemoManifest";
+import { toWorkbenchStyleClassName } from "../utils/workbenchStyleScope";
 
 /** One input style file and the CSS file generated from it. */
 export type WorkbenchCompileStyleFile = {
@@ -26,8 +30,8 @@ export type WorkbenchCompileStylesOptions = {
   inputDir: string;
   /** Directory where minified `.css` files are written. */
   outputDir: string;
-  /** Optional selector used to replace plain `body` selectors, for example `.likeBody` for embedded previews. */
-  bodySelectorReplacement?: string;
+  /** Enables workbench-only CSS isolation by prefixing regular selectors with `[workbench-scope]`. Pass `false` for production CSS output. Defaults to `true`. */
+  isolateStyles?: boolean;
   /** Optional prefix added to relative `url(...)` assets during compilation. Absolute/data/hash URLs are left unchanged. */
   assetUrlPrefix?: string;
   /** Remove `outputDir` before a full style compile. Ignored for incremental single-file watch rebuilds. */
@@ -91,16 +95,35 @@ export type WorkbenchCompileWatchOptions = WorkbenchCompileOptions & {
   watchPaths?: string[];
   /** Debounce for bursty editor/Sass writes. Defaults to 80ms. */
   debounceMs?: number;
+  /** Starts a small dev-only Server-Sent Events endpoint that notifies the browser when watched styles rebuild. */
+  styleReload?: boolean | WorkbenchStyleReloadOptions;
   /** Called after each successful compile, including the initial one. */
   onBuild?: (result: WorkbenchCompileResult) => void | Promise<void>;
   /** Called when a rebuild fails; defaults to logging the error. */
   onError?: (error: unknown) => void;
 };
 
+export type WorkbenchStyleReloadOptions = {
+  /** Local port for the style reload event stream. Defaults to 38297. */
+  port?: number;
+  /** Local host for the style reload event stream. Defaults to "127.0.0.1". */
+  host?: string;
+  /** HTTP path for the style reload event stream. Defaults to "/demo-workbench-style-events". */
+  path?: string;
+};
+
+export type WorkbenchStyleReloadManifest = {
+  enabled: boolean;
+  styleReloadUrl?: string;
+  updatedAt: string;
+};
+
 /** Handle returned by `watchWorkbenchCompile`. Call `close()` to stop the underlying chokidar watcher. */
 export type WorkbenchCompileWatchResult = {
   /** The raw chokidar watcher for advanced integrations. */
   watcher: FSWatcher;
+  /** Dev style reload URL when `styleReload` is enabled. */
+  styleReloadUrl?: string;
   /** Stop watching files and release resources. */
   close: () => Promise<void>;
 };
@@ -164,23 +187,168 @@ function rewriteAssetUrls(css: string, assetUrlPrefix?: string) {
   );
 }
 
-function replaceBodyInSelector(selector: string, replacement: string) {
+const workbenchScope = "[workbench-scope]";
+
+function splitSelectorList(selector: string) {
+  const selectors: string[] = [];
+  let segmentStart = 0;
+  let inString: '"' | "'" | null = null;
+  let parenDepth = 0;
+  let bracketDepth = 0;
+
+  for (let index = 0; index < selector.length; index += 1) {
+    const char = selector[index];
+
+    if (inString) {
+      if (char === "\\") {
+        index += 1;
+      } else if (char === inString) {
+        inString = null;
+      }
+      continue;
+    }
+
+    if (char === '"' || char === "'") {
+      inString = char;
+      continue;
+    }
+
+    if (char === "(") {
+      parenDepth += 1;
+      continue;
+    }
+
+    if (char === ")") {
+      parenDepth = Math.max(0, parenDepth - 1);
+      continue;
+    }
+
+    if (char === "[") {
+      bracketDepth += 1;
+      continue;
+    }
+
+    if (char === "]") {
+      bracketDepth = Math.max(0, bracketDepth - 1);
+      continue;
+    }
+
+    if (char === "," && parenDepth === 0 && bracketDepth === 0) {
+      selectors.push(selector.slice(segmentStart, index));
+      segmentStart = index + 1;
+    }
+  }
+
+  selectors.push(selector.slice(segmentStart));
+  return selectors;
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function cssEscape(value: string) {
+  const cssApi = globalThis.CSS as
+    | { escape?: (input: string) => string }
+    | undefined;
+
+  if (cssApi?.escape) {
+    return cssApi.escape(value);
+  }
+
+  return value.replace(/(^-?\d|[^a-zA-Z0-9_-])/g, (part) => {
+    const codePoint = part.codePointAt(0)?.toString(16) ?? "";
+    return `\\${codePoint} `;
+  });
+}
+
+function getStyleScopeSelector(outputFile: string) {
+  const styleClassName = toWorkbenchStyleClassName(outputFile);
+  return `${workbenchScope}.${cssEscape(styleClassName)}`;
+}
+
+function collapseAdjacentScopeSelectors(
+  selector: string,
+  scopeSelector: string,
+) {
+  const escapedScope = escapeRegExp(scopeSelector);
   return selector.replace(
-    /(^|[\s>+~,])body(?=$|[.#:\[\s>+~,])/g,
-    (_match, prefix: string) => {
-      return `${prefix}${replacement}`;
-    },
+    new RegExp(`${escapedScope}(?:\\s+${escapedScope})+`, "g"),
+    scopeSelector,
   );
 }
 
-function rewriteBodySelectors(css: string, replacement?: string) {
-  if (!replacement) return css;
+function replaceRootSelectorTokens(selector: string, replacement: string) {
+  let replaced = false;
 
+  const result = selector.replace(
+    /(^|[\s>+~,(])(?:body|html|:root)(?=$|[.#:\[\s>+~,)])/g,
+    (_match, prefix: string) => {
+      replaced = true;
+      return `${prefix}${replacement}`;
+    },
+  );
+
+  return {
+    selector: collapseAdjacentScopeSelectors(result, replacement),
+    replaced,
+  };
+}
+
+function scopeSingleSelector(selector: string, scopeSelector: string) {
+  const leading = selector.match(/^\s*/)?.[0] ?? "";
+  const trailing = selector.match(/\s*$/)?.[0] ?? "";
+  const value = selector.trim();
+
+  if (!value) return selector;
+
+  const rootReplaced = replaceRootSelectorTokens(value, scopeSelector);
+
+  if (rootReplaced.replaced) {
+    return `${leading}${rootReplaced.selector}${trailing}`;
+  }
+
+  if (value.startsWith(scopeSelector)) {
+    return selector;
+  }
+
+  return `${leading}${scopeSelector} ${value}${trailing}`;
+}
+
+function scopeSelectorList(selector: string, scopeSelector: string) {
+  return splitSelectorList(selector)
+    .map((part) => scopeSingleSelector(part, scopeSelector))
+    .join(",");
+}
+
+function getAtRuleName(prelude: string) {
+  const match = prelude.trimStart().match(/^@([a-z-]+)/i);
+  return match?.[1]?.toLowerCase();
+}
+
+function shouldSkipAtRuleChildren(atRuleName?: string) {
+  return (
+    atRuleName === "keyframes" ||
+    atRuleName === "-webkit-keyframes" ||
+    atRuleName === "font-face" ||
+    atRuleName === "property" ||
+    atRuleName === "counter-style" ||
+    atRuleName === "page"
+  );
+}
+
+function rewriteWorkbenchStyleSelectors(
+  css: string,
+  scopeSelector = workbenchScope,
+) {
   let result = "";
   let segmentStart = 0;
   let inString: '"' | "'" | null = null;
   let inComment = false;
   let parenDepth = 0;
+  const skipStack: boolean[] = [];
+
+  const isCurrentBlockSkipped = () => skipStack.some(Boolean);
 
   for (let index = 0; index < css.length; index += 1) {
     const char = css[index];
@@ -227,17 +395,38 @@ function rewriteBodySelectors(css: string, replacement?: string) {
     if (parenDepth > 0) continue;
 
     if (char === "{") {
-      const selector = css.slice(segmentStart, index);
-      const trimmed = selector.trimStart();
-      result += trimmed.startsWith("@")
-        ? selector
-        : replaceBodyInSelector(selector, replacement);
+      const prelude = css.slice(segmentStart, index);
+      const trimmed = prelude.trimStart();
+
+      if (trimmed.startsWith("@")) {
+        const atRuleName = getAtRuleName(prelude);
+        const skipChildren =
+          isCurrentBlockSkipped() || shouldSkipAtRuleChildren(atRuleName);
+
+        result += prelude;
+        result += char;
+        skipStack.push(skipChildren);
+        segmentStart = index + 1;
+        continue;
+      }
+
+      result += isCurrentBlockSkipped()
+        ? prelude
+        : scopeSelectorList(prelude, scopeSelector);
       result += char;
+      skipStack.push(isCurrentBlockSkipped());
       segmentStart = index + 1;
       continue;
     }
 
-    if (char === "}" || char === ";") {
+    if (char === "}") {
+      result += css.slice(segmentStart, index + 1);
+      skipStack.pop();
+      segmentStart = index + 1;
+      continue;
+    }
+
+    if (char === ";") {
       result += css.slice(segmentStart, index + 1);
       segmentStart = index + 1;
     }
@@ -245,6 +434,16 @@ function rewriteBodySelectors(css: string, replacement?: string) {
 
   result += css.slice(segmentStart);
   return result;
+}
+
+function rewriteWorkbenchCss(
+  css: string,
+  options: Pick<WorkbenchCompileStylesOptions, "isolateStyles">,
+  scopeSelector = workbenchScope,
+) {
+  if (options.isolateStyles === false) return css;
+
+  return rewriteWorkbenchStyleSelectors(css, scopeSelector);
 }
 
 async function compileInputFile(inputPath: string, inputDir: string) {
@@ -276,6 +475,19 @@ async function fileExists(filePath: string) {
   } catch {
     return false;
   }
+}
+
+async function writeFileIfChanged(filePath: string, content: string) {
+  try {
+    if ((await readFile(filePath, "utf8")) === content) {
+      return false;
+    }
+  } catch {
+    // Missing or unreadable files are written by the caller's normal path.
+  }
+
+  await writeFile(filePath, content);
+  return true;
 }
 
 function renderGeneratedRegistry(registry: { demos: string[] }) {
@@ -312,7 +524,7 @@ async function writeGeneratedRegistrySource(registry: { demos: string[] }) {
 
   if (!outputFile) return null;
 
-  await writeFile(outputFile, renderGeneratedRegistry(registry));
+  await writeFileIfChanged(outputFile, renderGeneratedRegistry(registry));
   return outputFile;
 }
 
@@ -342,7 +554,7 @@ async function writeGeneratedRegistryBundle(registry: { demos: string[] }) {
   for (const outputFile of outputFiles) {
     const source = await readFile(outputFile, "utf8");
     if (!registryPattern.test(source)) continue;
-    await writeFile(
+    await writeFileIfChanged(
       outputFile,
       source.replace(registryPattern, renderedRegistry),
     );
@@ -418,7 +630,13 @@ async function compileStyleFile(
   }
 
   const rewrittenCss = rewriteAssetUrls(
-    rewriteBodySelectors(compiledCss, options.bodySelectorReplacement),
+    rewriteWorkbenchCss(
+      compiledCss,
+      {
+        isolateStyles: options.isolateStyles,
+      },
+      getStyleScopeSelector(styleFile.outputFile),
+    ),
     options.assetUrlPrefix,
   );
   let minified: ReturnType<typeof transform>;
@@ -504,6 +722,9 @@ export async function workbenchCompile(
   const styles = options.styles
     ? await compileStyles(options.styles)
     : undefined;
+  if (styles) {
+    await writeStyleReloadManifest(styles.outputDir, { enabled: false });
+  }
   const registry = await compileGeneratedRegistry(options);
 
   return { styles, ...registry };
@@ -530,6 +751,163 @@ function isPathInDirectory(filePath: string, directory: string) {
     !relative.startsWith("..") &&
     !path.isAbsolute(relative)
   );
+}
+
+const DEFAULT_STYLE_RELOAD_PORT = 38297;
+const DEFAULT_STYLE_RELOAD_HOST = "127.0.0.1";
+const DEFAULT_STYLE_RELOAD_PATH = "/demo-workbench-style-events";
+export const WORKBENCH_STYLE_RELOAD_MANIFEST_FILE =
+  "demo-workbench-style-reload.json";
+
+type WorkbenchStyleReloadServer = {
+  url: string;
+  update: (files: WorkbenchCompileStyleFile[]) => Promise<void>;
+  send: (files: WorkbenchCompileStyleFile[]) => Promise<void>;
+  close: () => Promise<void>;
+};
+
+function renderStyleReloadManifest(
+  manifest: Omit<WorkbenchStyleReloadManifest, "updatedAt">,
+) {
+  return `${JSON.stringify(
+    {
+      ...manifest,
+      updatedAt: new Date().toISOString(),
+    } satisfies WorkbenchStyleReloadManifest,
+    null,
+    2,
+  )}\n`;
+}
+
+async function writeStyleReloadManifest(
+  outputDir: string,
+  manifest: Omit<WorkbenchStyleReloadManifest, "updatedAt">,
+) {
+  const outputFile = path.resolve(
+    outputDir,
+    WORKBENCH_STYLE_RELOAD_MANIFEST_FILE,
+  );
+
+  await mkdir(path.dirname(outputFile), { recursive: true });
+  await writeFileIfChanged(outputFile, renderStyleReloadManifest(manifest));
+  return outputFile;
+}
+
+function resolveStyleReloadOptions(
+  options: WorkbenchCompileWatchOptions["styleReload"],
+): Required<WorkbenchStyleReloadOptions> | null {
+  if (!options) return null;
+
+  const value = options === true ? {} : options;
+
+  return {
+    port: value.port ?? DEFAULT_STYLE_RELOAD_PORT,
+    host: value.host ?? DEFAULT_STYLE_RELOAD_HOST,
+    path: value.path ?? DEFAULT_STYLE_RELOAD_PATH,
+  };
+}
+
+async function createStyleReloadServer(
+  options: WorkbenchCompileWatchOptions["styleReload"],
+): Promise<WorkbenchStyleReloadServer | null> {
+  const resolved = resolveStyleReloadOptions(options);
+  if (!resolved) return null;
+
+  const clients = new Set<ServerResponse>();
+  const cssByFileName = new Map<string, string>();
+  const getFileName = (file: WorkbenchCompileStyleFile) =>
+    path.basename(file.outputFile, ".css");
+
+  const update = async (files: WorkbenchCompileStyleFile[]) => {
+    await Promise.all(
+      files.map(async (file) => {
+        cssByFileName.set(
+          getFileName(file),
+          await readFile(file.outputPath, "utf8"),
+        );
+      }),
+    );
+  };
+
+  const server: Server = createServer((request, response) => {
+    const requestUrl = new URL(
+      request.url ?? "/",
+      `http://${request.headers.host ?? `${resolved.host}:${resolved.port}`}`,
+    );
+    const requestPath = requestUrl.pathname;
+
+    if (requestPath !== resolved.path) {
+      response.writeHead(404);
+      response.end();
+      return;
+    }
+
+    const styleName = requestUrl.searchParams.get("style");
+    if (styleName) {
+      const fileName = path.basename(styleName, ".css");
+      const css = cssByFileName.get(fileName);
+
+      if (css === undefined) {
+        response.writeHead(404, {
+          "Access-Control-Allow-Origin": "*",
+          "Cache-Control": "no-store",
+        });
+        response.end();
+        return;
+      }
+
+      response.writeHead(200, {
+        "Access-Control-Allow-Origin": "*",
+        "Cache-Control": "no-store",
+        "Content-Type": "text/css; charset=utf-8",
+      });
+      response.end(css);
+      return;
+    }
+
+    response.writeHead(200, {
+      "Access-Control-Allow-Origin": "*",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+      "Content-Type": "text/event-stream",
+    });
+    response.write("event: ready\ndata: {}\n\n");
+    clients.add(response);
+    request.on("close", () => clients.delete(response));
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(resolved.port, resolved.host, () => {
+      server.off("error", reject);
+      resolve();
+    });
+  });
+
+  const address = server.address() as AddressInfo | null;
+  const port = address?.port ?? resolved.port;
+  const urlHost = resolved.host === "0.0.0.0" ? "localhost" : resolved.host;
+  const url = `http://${urlHost}:${port}${resolved.path}`;
+
+  return {
+    url,
+    update,
+    send: async (files) => {
+      await update(files);
+      const fileNames = files.map(getFileName);
+      const data = JSON.stringify({ fileNames });
+
+      clients.forEach((client) => {
+        client.write(`event: styles\ndata: ${data}\n\n`);
+      });
+    },
+    close: () =>
+      new Promise((resolve) => {
+        clients.forEach((client) => client.end());
+        clients.clear();
+        server.close(() => resolve());
+      }),
+  };
 }
 
 async function compileWatchEvents(
@@ -592,6 +970,7 @@ export async function watchWorkbenchCompile(
     debounceMs = 80,
     onBuild,
     onError,
+    styleReload,
     watchPaths: extraWatchPaths = [],
     ...compileOptions
   } = options;
@@ -599,12 +978,25 @@ export async function watchWorkbenchCompile(
     compileOptions,
     extraWatchPaths,
   );
+  const styleReloadServer = await createStyleReloadServer(styleReload);
 
   const runBuild = async (events?: StyleCompileEvent[]) => {
     const result = events?.length
       ? await compileWatchEvents(compileOptions, events, extraWatchPaths)
       : await workbenchCompile(compileOptions);
+    if (result.styles) {
+      await styleReloadServer?.update(result.styles.files);
+      if (styleReloadServer) {
+        await writeStyleReloadManifest(result.styles.outputDir, {
+          enabled: true,
+          styleReloadUrl: styleReloadServer.url,
+        });
+      }
+    }
     await onBuild?.(result);
+    if (events?.length && result.styles) {
+      await styleReloadServer?.send(result.styles.files);
+    }
     return result;
   };
 
@@ -647,7 +1039,16 @@ export async function watchWorkbenchCompile(
 
   return {
     watcher,
-    close: () => watcher.close(),
+    styleReloadUrl: styleReloadServer?.url,
+    close: async () => {
+      if (compileOptions.styles) {
+        await writeStyleReloadManifest(compileOptions.styles.outputDir, {
+          enabled: false,
+        });
+      }
+      await watcher.close();
+      await styleReloadServer?.close();
+    },
   };
 }
 
@@ -658,7 +1059,7 @@ export async function compileWorkbenchStyles(
     styles: {
       inputDir: options.inputDir,
       outputDir: options.outputDir,
-      bodySelectorReplacement: options.bodySelectorReplacement,
+      isolateStyles: options.isolateStyles,
       assetUrlPrefix: options.assetUrlPrefix,
       clean: options.clean,
     },

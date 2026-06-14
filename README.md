@@ -101,14 +101,15 @@ function DemoWorkbench(props: DemoWorkbenchProps): JSX.Element;
 - `demos?: DemoItem[]` - searchable demo manifest. If omitted, generated registry names are loaded through `demoLoader`.
 - `demoLoader?: (name: string) => Promise<DemoModule>` - async loader for generated demo names.
 - `styleLoader?: (name: string) => Promise<unknown>` - dynamic style loader used by `styled-atom`.
-- `cssFiles?: string[]` - host-level CSS atoms loaded by the shell and added to every demo preview.
-- `baseCssFiles?: string[]` - deprecated compatibility alias for `cssFiles`.
+- `styleReloadUrl?: string | false` - optional dev-only SSE URL used to reload mounted style atoms after watch rebuilds.
+- `baseCssFiles?: string[]` - host-level CSS atoms loaded by the shell.
+- `baseCssLayer?: string` - cascade layer for host CSS.
+- `baseCss?: string` - raw host CSS injected once before `baseCssFiles` in the same layer.
 - `storageData?: DemoWorkbenchStorageEntry[]` - fields that should persist between reloads.
 - `viewport?: { width: number; height: number }` - base preview viewport used for modal scaling.
 - `initialState?: DemoWorkbenchInitialState` - state applied before storage restoration.
 - `renderDemoContent?: (pageName: string) => ReactNode` - optional host content rendered inside opened demos.
 - `bodyBg?: string` - inline background value for the opened demo body.
-- `bodySelectorReplacement?: string` - replacement selector for embedded body-like roots.
 - `notFoundComponent?: ComponentType` - fallback component for unknown demo pages.
 
 <b>Return:</b><br />
@@ -202,7 +203,6 @@ const result = await workbenchCompile({
   styles: {
     inputDir: "titans_rc/styles/scss",
     outputDir: "src/styles/css",
-    bodySelectorReplacement: ".likeBody",
     assetUrlPrefix: "http://localhost:3000/img/",
   },
   demos: { inputDir: "src/components/pages" },
@@ -214,13 +214,15 @@ console.log(result.demos?.names);
 
 <b>Description:</b><em><br />
 Runs the requested compile sections and returns the same top-level shape: <code>{ styles, demos }</code>.<br />
-Styles are compiled from top-level <code>.css</code>, <code>.scss</code> and <code>.sass</code> files, minified, optionally rewritten, and written as <code>.css</code> files. Demo names are discovered from file basenames and written to the generated workbench registry when a target is available.
+Styles are compiled from top-level <code>.css</code>, <code>.scss</code> and <code>.sass</code> files, isolated under <code>[workbench-scope]</code> plus a generated CSS file class by default, minified, and written as <code>.css</code> files. For example, <code>screen.scss</code> selectors are scoped under <code>[workbench-scope].screen</code>, while <code>01-all.scss</code> uses the safe class <code>[workbench-scope].css-01-all</code>. Pass <code>isolateStyles: false</code> when compiling production CSS that should keep its original selectors. Demo names are discovered from file basenames and written to the generated workbench registry when a target is available.
 </em><br />
 
 <b>Signature:</b><br />
 
 ```ts
-function workbenchCompile(options: WorkbenchCompileOptions): Promise<WorkbenchCompileResult>;
+function workbenchCompile(
+  options: WorkbenchCompileOptions,
+): Promise<WorkbenchCompileResult>;
 ```
 
 <b>Return:</b><br />
@@ -262,7 +264,7 @@ const popupNames = await discoverWorkbenchFileNames({
 ```
 
 <b>Description:</b><em><br />
-Scans one directory and returns sorted file basenames. By default it includes <code>.jsx</code>, <code>.tsx</code>, <code>.js</code> and <code>.ts</code> files, while ignoring dotfiles, <code>.d.ts</code>, <code>_*</code>, <code>a_*</code> and explicitly excluded basenames.
+Scans one directory and returns sorted file basenames. By default it includes <code>.jsx</code>, <code>.tsx</code>, <code>.js</code> and <code>.ts</code> files, while ignoring dotfiles, <code>.d.ts</code>, <code>_\*</code>, <code>a_\*</code> and explicitly excluded basenames.
 </em><br />
 
 </div></ul></details>
@@ -280,9 +282,9 @@ await watchWorkbenchCompile({
   styles: {
     inputDir: "titans_rc/styles/scss",
     outputDir: "src/styles/css",
-    bodySelectorReplacement: ".likeBody",
   },
   demos: { inputDir: "src/components/pages" },
+  styleReload: true,
   onBuild: (result) => {
     if (result.styles) {
       console.log(result.styles.files.map((file) => file.outputFile));
@@ -292,7 +294,7 @@ await watchWorkbenchCompile({
 ```
 
 <b>Description:</b><em><br />
-Starts with one full compile. After that, direct changes to one top-level style file recompile only that file. Changes to Sass partials such as <code>_mixins.scss</code> trigger a full style compile because dependency ownership is ambiguous. Demo changes regenerate only the registry section.
+Starts with one full compile. After that, direct changes to one top-level style file recompile only that file. Changes to Sass partials such as <code>\_mixins.scss</code> trigger a full style compile because dependency ownership is ambiguous. Demo changes regenerate only the registry section.
 </em><br />
 
 <b>Return:</b><br />
@@ -360,7 +362,9 @@ npm run build
 <DemoWorkbench
   demos={demos}
   styleLoader={(name) => import(`../styles/${name}.css`)}
-  cssFiles={["output", "theme"]}
+  styleReloadUrl="http://127.0.0.1:38297/demo-workbench-style-events"
+  baseCssFiles={["output", "theme"]}
+  baseCss={`[workbench-scope] { min-height: 100%; }`}
 />
 ```
 
@@ -375,7 +379,6 @@ const options = {
   styles: {
     inputDir: "titans_rc/styles/scss",
     outputDir: "src/styles/css",
-    bodySelectorReplacement: ".likeBody",
   },
   demos: { inputDir: "src/components/pages" },
 };

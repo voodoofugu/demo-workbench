@@ -50,7 +50,6 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "dev:open": "vite --host 127.0.0.1 --open",
-    "prepare": "npm run build",
     "build": "npm run build:styles && tsup src/index.ts src/node/index.ts src/node/cli.ts --format esm,cjs --dts --clean --shims && cp src/styles/workbench.css dist/styles.css",
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm run build && npm test && npm run pack:dry",
@@ -68,7 +67,7 @@
     "morphing-scroll": "^2.9.0",
     "nexus-state": "^3.1.0",
     "sass-embedded": "^1.100.0",
-    "styled-atom": "^2.1.1"
+    "styled-atom": "file:../styled-atom"
   },
   "peerDependencies": {
     "react": ">=18 <20",

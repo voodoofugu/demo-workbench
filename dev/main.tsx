@@ -30,7 +30,7 @@ function App() {
       title="demo-workbench dev"
       demos={exampleDemoPages}
       styleLoader={styleLoader}
-      cssFiles={["output"]}
+      baseCssFiles={["output"]}
       viewport={{ width: 960, height: 540 }}
       renderDemoContent={(pageName) => (
         <p className="demo-workbench-dev-note">
