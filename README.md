@@ -122,75 +122,6 @@ Project-level SVG filters/defs should be rendered by the host app as normal sibl
 
 <h2></h2>
 
-###### **— DATA —**
-
-<details><summary><b><code>DemoItem</code></b>: <em>describe one demo entry</em></summary><br /><ul><div>
-
-<b>Usage:</b><br />
-
-```ts
-import type { DemoItem } from "demo-workbench";
-
-const demos: DemoItem[] = [
-  {
-    name: "Button",
-    load: () => import("./demos/ButtonDemo"),
-  },
-  {
-    name: "Card",
-    title: "Card states",
-    load: () => import("./demos/CardDemo"),
-    cssFiles: ["card-demo"],
-  },
-];
-
-export default demos;
-```
-
-<b>Description:</b><em><br />
-A demo entry is intentionally small: a stable name, an async module loader and optional CSS atom names.<br />
-Each loaded module should export a React component as <code>default</code>. The component receives <code>pageName</code> and may render children supplied by the workbench.
-</em><br />
-
-<b>Shape:</b><br />
-
-```ts
-type DemoItem = {
-  name: string;
-  title?: string;
-  load: () => Promise<DemoModule>;
-  css?: string[];
-  cssFiles?: string[];
-};
-```
-
-<b>Return behavior:</b><br />
-`load()` resolves to a `DemoModule`. `cssFiles` is the preferred field for style atom names; `css` is kept for older manifests.
-
-</div></ul></details>
-
-<h2></h2>
-
-<details><summary><b><code>DemoModule</code></b>: <em>module returned by a demo loader</em></summary><br /><ul><div>
-
-<b>Shape:</b><br />
-
-```ts
-type DemoModule = {
-  default: ComponentType<{ pageName?: string; children?: ReactNode }>;
-  css?: string[];
-  cssFiles?: string[];
-};
-```
-
-<b>Description:</b><em><br />
-`default` is the React component rendered by the workbench. Optional style arrays are loaded before rendering the preview.
-</em><br />
-
-</div></ul></details>
-
-<h2></h2>
-
 ###### **— NODE —**
 
 <details><summary><b><code>workbenchCompile</code></b>: <em>compile styles and generated demo registry</em></summary><br /><ul><div>
@@ -462,51 +393,6 @@ await watchWorkbenchCompile({
 ```
 
 </details>
-
-<h2></h2>
-
-### Development
-
-To run the local example workbench in the browser:
-
-```bash
-npm run dev
-```
-
-Then open `http://127.0.0.1:5173/`. The dev app lives in `dev/main.tsx` and renders the example manifest from `examples/index.js`, so it is a quick place to adjust shell/components/styles and immediately see how the demo pages render.
-
-```bash
-npm run typecheck
-npm run build
-npm run pack:dry
-```
-
-For release preparation:
-
-```bash
-npm run package-prepare
-npm run publish:dry
-npm run publish
-```
-
-`package-prepare` builds the library and creates a clean `publish/` directory with only the files needed for npm publication.
-
-<h2></h2>
-
-### CI
-
-CI is useful here because the package is meant to be reused by other projects. It catches broken imports, missing type declarations, failed builds and invalid npm package contents before a change becomes the version that another project installs.
-
-The intended CI flow is small:
-
-```bash
-npm ci
-npm run typecheck
-npm run build
-npm run pack:dry
-```
-
-This is enough for the current package: it verifies TypeScript, creates ESM/CJS/declaration output, copies the workbench CSS and checks the npm tarball contents.
 
 <h2></h2>
 

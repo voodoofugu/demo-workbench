@@ -5,6 +5,7 @@ export {
   watchWorkbenchCompile,
   workbenchCompile,
 } from "./workbenchCompile";
+
 export type {
   CompileWorkbenchStylesOptions,
   CompileWorkbenchStylesResult,
@@ -20,5 +21,6 @@ export type {
   WorkbenchStyleReloadOptions,
   WorkbenchStyleReloadManifest,
 } from "./workbenchCompile";
+
 export { discoverWorkbenchFileNames } from "./generateDemoManifest";
 export type { WorkbenchFileNameDiscoveryOptions } from "./generateDemoManifest";
