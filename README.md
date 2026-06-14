@@ -8,8 +8,6 @@
 - [Installation](#installation)
 - [API](#api)
 - [Common patterns](#common-patterns)
-- [Development](#development)
-- [CI](#ci)
 - [License](#license)
 
 <h2></h2>
