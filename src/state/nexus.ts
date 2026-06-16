@@ -33,19 +33,7 @@ export type WorkbenchStateUpdate =
   | Partial<WorkbenchState>
   | ((state: WorkbenchState) => Partial<WorkbenchState>);
 
-type nexus = {
-  get(): WorkbenchState;
-  get<Key extends keyof WorkbenchState>(key: Key): WorkbenchState[Key];
-  use(): WorkbenchState;
-  use<Key extends keyof WorkbenchState>(key: Key): WorkbenchState[Key];
-  set(state: WorkbenchStateUpdate): void;
-  subscribe(
-    callback: (state: WorkbenchState) => void,
-    keys: (keyof WorkbenchState | "*")[],
-  ): () => void;
-};
-
-const nexus: nexus = createReactNexus<WorkbenchState>({
+const nexus = createReactNexus<WorkbenchState, object>({
   state: {
     activePage: "",
     darkTheme: false,

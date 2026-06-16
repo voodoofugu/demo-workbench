@@ -48,7 +48,7 @@ const DemoGrid = memo(function DemoGrid({
   const { state, setWorkbenchState } = useWorkbenchStore();
 
   const [isScrolling, setIsScrolling] = useState<boolean>(false);
-  const [loadedDemoNames, setLoadedDemoNames] = useState<Set<string>>(
+  const [renderedDemoNames, setRenderedDemoNames] = useState<Set<string>>(
     () => new Set(),
   );
   const [pagePosition, setPagePosition] = useState<PositionData>({
@@ -72,6 +72,7 @@ const DemoGrid = memo(function DemoGrid({
   const savedScrollTop = Number(state.scrollTop) || 0;
   const lastStoredScrollTopRef = useRef(savedScrollTop);
   const latestSavedScrollTopRef = useRef(savedScrollTop);
+  const pendingRenderedKeysRef = useRef<string[] | null>(null);
   const scrollFrameRef = useRef<number | null>(null);
   const restoredScrollPositionRef = useRef(false);
   latestSavedScrollTopRef.current = savedScrollTop;
@@ -110,30 +111,6 @@ const DemoGrid = memo(function DemoGrid({
       demos.find((demo) => (demo.name ?? demo.title) === activePage) ?? null,
     [activePage, demos],
   );
-
-  useEffect(() => {
-    const demoNames = new Set(
-      demos.map((demo) => demo.name ?? demo.title).filter(Boolean),
-    );
-
-    setLoadedDemoNames((prev) => {
-      const next = new Set(
-        Array.from(prev).filter((demoName) => demoNames.has(demoName)),
-      );
-
-      return next.size === prev.size ? prev : next;
-    });
-  }, [demos]);
-
-  const markDemoLoaded = useCallback((demoName: string) => {
-    setLoadedDemoNames((prev) => {
-      if (prev.has(demoName)) return prev;
-
-      const next = new Set(prev);
-      next.add(demoName);
-      return next;
-    });
-  }, []);
 
   useLayoutEffect(() => {
     if (!hashState) return;
@@ -266,6 +243,29 @@ const DemoGrid = memo(function DemoGrid({
     [],
   );
 
+  const applyRenderedKeys = useCallback((keys: string[]) => {
+    setRenderedDemoNames(new Set(keys));
+  }, []);
+
+  const handleRenderedKeysChange = useCallback(
+    (keys: string[]) => {
+      pendingRenderedKeysRef.current = keys;
+
+      if (!isScrolling) {
+        applyRenderedKeys(keys);
+      }
+    },
+    [applyRenderedKeys, isScrolling],
+  );
+
+  useEffect(() => {
+    if (isScrolling || !pendingRenderedKeysRef.current) return;
+
+    applyRenderedKeys(pendingRenderedKeysRef.current);
+  }, [applyRenderedKeys, isScrolling]);
+
+  const handleDemoLoad = useCallback(() => undefined, []);
+
   const handleToTopClick = useCallback(() => {
     setScrollPosition((prev) => ({
       value: 0,
@@ -283,9 +283,9 @@ const DemoGrid = memo(function DemoGrid({
         demo={demo}
         isOpen={activePage === demoName}
         onOpen={openDemo}
-        onLoad={markDemoLoaded}
+        onLoad={handleDemoLoad}
         renderDemoContent={renderDemoContent}
-        isDemoLoaded={loadedDemoNames.has(demoName)}
+        isDemoLoaded={!isScrolling && renderedDemoNames.has(demoName)}
         isScrolling={isScrolling}
         scrollTop={savedScrollTop}
         searchText={searchText}
@@ -317,8 +317,8 @@ const DemoGrid = memo(function DemoGrid({
               showContent={showContent}
               onClose={closeDemo}
               onOpen={openDemo}
-              onLoad={markDemoLoaded}
-              isDemoLoaded={loadedDemoNames.has(activePage)}
+              onLoad={handleDemoLoad}
+              isDemoLoaded
               renderDemoContent={renderDemoContent}
             />
           </div>,
@@ -349,6 +349,7 @@ const DemoGrid = memo(function DemoGrid({
         isScrolling={(v) => setIsScrolling(v)}
         scrollBarEdge={30}
         scrollBarOnHover
+        onRenderedKeysChange={handleRenderedKeysChange}
       >
         {components}
       </MorphScroll>

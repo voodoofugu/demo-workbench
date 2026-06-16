@@ -213,6 +213,12 @@ const DemoCell = memo(function DemoCell({
         attribute: { [scopeAttributeName]: "" },
         className: scopeClassName || undefined,
       }}
+      css={`
+        .likeBody {
+          color-scheme: dark;
+          min-height: 100%;
+        }
+      `}
     >
       {body}
     </StyledAtom>
