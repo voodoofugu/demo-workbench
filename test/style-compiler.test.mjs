@@ -21,6 +21,23 @@ async function withTempDir(fn) {
   }
 }
 
+async function readOptionalFile(filePath) {
+  try {
+    return await readFile(filePath, "utf8");
+  } catch {
+    return null;
+  }
+}
+
+async function restoreFileSnapshot({ filePath, content }) {
+  if (content === null) {
+    await rm(filePath, { force: true });
+    return;
+  }
+
+  await writeFile(filePath, content);
+}
+
 test("compileWorkbenchStyles scopes demo css, rewrites root selectors, url assets, and minifies output", async () => {
   await withTempDir(async (dir) => {
     const inputDir = path.join(dir, "input");
@@ -103,7 +120,8 @@ test("compileWorkbenchStyles scopes demo css, rewrites root selectors, url asset
       plainCss,
       /\[workbench-scope\]\.plain \.note\{background:url\(http:\/\/localhost:3000\/img\/icons\/note\.svg\)\}/,
     );
-    assert.doesNotMatch(plainCss, /\n/);
+    assert.match(plainCss, /\/\*# sourceURL=plain\.css \*\/$/);
+    assert.equal(plainCss.split("\n").length, 2);
   });
 });
 
@@ -120,7 +138,7 @@ test("compileWorkbenchStyles can emit production css without workbench isolation
     await compileWorkbenchStyles({
       inputDir,
       outputDir,
-      isolateStyles: false,
+      compileForWorkbench: false,
     });
 
     const css = await readFile(path.join(outputDir, "prod.css"), "utf8");
@@ -128,15 +146,22 @@ test("compileWorkbenchStyles can emit production css without workbench isolation
     assert.match(css, /body\{margin:0\}/);
     assert.match(css, /\.card\{color:#00f\}/);
     assert.doesNotMatch(css, /\[workbench-scope\]/);
+    assert.doesNotMatch(css, /sourceURL=/);
   });
 });
 
 test("workbenchCompile returns section-shaped styles and demos results", async () => {
-  const registryPath = path.join(
-    process.cwd(),
-    "src/state/generatedWorkbenchRegistry.ts",
+  const registryFiles = [
+    path.join(process.cwd(), "src/state/generatedWorkbenchRegistry.ts"),
+    path.join(process.cwd(), "dist/index.js"),
+    path.join(process.cwd(), "dist/index.cjs"),
+  ];
+  const originalRegistryFiles = await Promise.all(
+    registryFiles.map(async (filePath) => ({
+      filePath,
+      content: await readOptionalFile(filePath),
+    })),
   );
-  const originalRegistry = await readFile(registryPath, "utf8");
 
   try {
     await withTempDir(async (dir) => {
@@ -171,7 +196,7 @@ test("workbenchCompile returns section-shaped styles and demos results", async (
       assert.equal("fileRegistry" in result, false);
     });
   } finally {
-    await writeFile(registryPath, originalRegistry);
+    await Promise.all(originalRegistryFiles.map(restoreFileSnapshot));
   }
 });
 

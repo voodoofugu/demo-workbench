@@ -3,7 +3,6 @@ import type { Dirent } from "node:fs";
 import { createServer } from "node:http";
 import type { Server, ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
-import chokidar from "chokidar";
 import type { FSWatcher } from "chokidar";
 import path from "node:path";
 import { transform } from "lightningcss";
@@ -56,8 +55,8 @@ export type WorkbenchCompileStylesOptions = {
   inputDir: string;
   /** Directory where minified `.css` files are written. */
   outputDir: string;
-  /** Enables workbench-only CSS isolation by prefixing regular selectors with `[workbench-scope]`. Pass `false` for production CSS output. Defaults to `true`. */
-  isolateStyles?: boolean;
+  /** Compile CSS for the workbench runtime: scope selectors and append a sourceURL for DevTools. Pass `false` for minimal production CSS output. Defaults to `true`. */
+  compileForWorkbench?: boolean;
   /** Optional prefix added to relative `url(...)` assets during compilation. Absolute/data/hash URLs are left unchanged. */
   assetUrlPrefix?: string;
   /** Remove `outputDir` before a full style compile. Ignored for incremental single-file watch rebuilds. */
@@ -548,12 +547,24 @@ function rewriteWorkbenchStyleSelectors(
 
 function rewriteWorkbenchCss(
   css: string,
-  options: Pick<WorkbenchCompileStylesOptions, "isolateStyles">,
+  options: Pick<WorkbenchCompileStylesOptions, "compileForWorkbench">,
   scopeSelector = workbenchScope,
 ) {
-  if (options.isolateStyles === false) return css;
+  if (!shouldCompileForWorkbench(options)) return css;
 
   return rewriteWorkbenchStyleSelectors(css, scopeSelector);
+}
+
+function shouldCompileForWorkbench(
+  options: Pick<WorkbenchCompileStylesOptions, "compileForWorkbench">,
+) {
+  return options.compileForWorkbench !== false;
+}
+
+function appendStyleSourceUrl(css: Uint8Array, outputFile: string) {
+  const cssText = Buffer.from(css).toString().trimEnd();
+  const sourceUrl = `/*# sourceURL=${encodeURI(outputFile)} */`;
+  return Buffer.from(`${cssText}\n${sourceUrl}`);
 }
 
 async function compileInputFile(inputPath: string, inputDir: string) {
@@ -743,7 +754,7 @@ async function compileStyleFile(
     rewriteWorkbenchCss(
       compiledCss,
       {
-        isolateStyles: options.isolateStyles,
+        compileForWorkbench: options.compileForWorkbench,
       },
       getStyleScopeSelector(styleFile.outputFile),
     ),
@@ -762,7 +773,11 @@ async function compileStyleFile(
     );
   }
 
-  await writeFile(styleFile.outputPath, minified.code);
+  const outputCss = shouldCompileForWorkbench(options)
+    ? appendStyleSourceUrl(minified.code, styleFile.outputFile)
+    : minified.code;
+
+  await writeFile(styleFile.outputPath, outputCss);
   return styleFile;
 }
 
@@ -1132,6 +1147,8 @@ async function compileWatchEvents(
 export async function watchWorkbenchCompile(
   options: WorkbenchCompileWatchOptions,
 ): Promise<WorkbenchCompileWatchResult> {
+  const { default: chokidar } = await import("chokidar");
+
   const {
     debounceMs = 80,
     onBuild,
@@ -1140,18 +1157,22 @@ export async function watchWorkbenchCompile(
     watchPaths: extraWatchPaths = [],
     ...compileOptions
   } = options;
+
   const watchPaths = getWorkbenchCompileWatchPaths(
     compileOptions,
     extraWatchPaths,
   );
+
   const styleReloadServer = await createStyleReloadServer(styleReload);
 
   const runBuild = async (events?: StyleCompileEvent[]) => {
     const result = events?.length
       ? await compileWatchEvents(compileOptions, events, extraWatchPaths)
       : await workbenchCompile(compileOptions);
+
     if (result.styles) {
       await styleReloadServer?.update(result.styles.files);
+
       if (styleReloadServer) {
         await writeStyleReloadManifest(result.styles.outputDir, {
           enabled: true,
@@ -1159,10 +1180,13 @@ export async function watchWorkbenchCompile(
         });
       }
     }
+
     await onBuild?.(result);
+
     if (events?.length && result.styles) {
       await styleReloadServer?.send(result.styles.files);
     }
+
     return result;
   };
 
@@ -1179,21 +1203,27 @@ export async function watchWorkbenchCompile(
 
   let pending: NodeJS.Timeout | null = null;
   let pendingEvents: StyleCompileEvent[] = [];
+
   const scheduleBuild = (
     event: StyleCompileEvent["event"],
     inputPath: string,
   ) => {
     pendingEvents.push({ event, inputPath });
+
     if (pending) clearTimeout(pending);
+
     pending = setTimeout(() => {
       const events = pendingEvents;
+
       pendingEvents = [];
       pending = null;
+
       runBuild(events).catch((error: unknown) => {
         if (onError) {
           onError(error);
           return;
         }
+
         console.error(error instanceof Error ? error.message : error);
       });
     }, debounceMs);
@@ -1206,12 +1236,14 @@ export async function watchWorkbenchCompile(
   return {
     watcher,
     styleReloadUrl: styleReloadServer?.url,
+
     close: async () => {
       if (compileOptions.styles) {
         await writeStyleReloadManifest(compileOptions.styles.outputDir, {
           enabled: false,
         });
       }
+
       await watcher.close();
       await styleReloadServer?.close();
     },
@@ -1240,7 +1272,7 @@ export async function compileWorkbenchStyles(
     styles: {
       inputDir: options.inputDir,
       outputDir: options.outputDir,
-      isolateStyles: options.isolateStyles,
+      compileForWorkbench: options.compileForWorkbench,
       assetUrlPrefix: options.assetUrlPrefix,
       clean: options.clean,
     },

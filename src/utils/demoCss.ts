@@ -9,7 +9,7 @@ export function normalizeModuleCssFiles(
 
   if (demoCssFiles.length) return demoCssFiles;
 
-  const moduleCssFiles = module?.cssFiles ?? module?.css ?? [];
+  const moduleCssFiles = module?.cssFiles ?? [];
   return Array.isArray(moduleCssFiles) ? moduleCssFiles.filter(Boolean) : [];
 }
 

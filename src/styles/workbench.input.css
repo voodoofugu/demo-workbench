@@ -2,6 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
+.likeBody {
+  color-scheme: dark;
+  min-height: 100%;
+}
+
 .templateScroll
   > .ms-content
   > .ms-element

@@ -9,6 +9,38 @@ const rootPackage = JSON.parse(
   await readFile(path.join(root, "package.json"), "utf8"),
 );
 
+const isLocalDependencySpec = (spec) =>
+  spec.startsWith(".") || spec.startsWith("/") || spec.startsWith("file:");
+
+const readLocalDependencyVersion = async (spec) => {
+  const localPath = spec.startsWith("file:")
+    ? spec.slice("file:".length)
+    : spec;
+  const packagePath = path.resolve(root, localPath, "package.json");
+  const packageJson = JSON.parse(await readFile(packagePath, "utf8"));
+
+  return packageJson.version;
+};
+
+const normalizePublishDependencies = async (dependencies = {}) => {
+  const entries = await Promise.all(
+    Object.entries(dependencies).map(async ([name, spec]) => {
+      if (typeof spec !== "string" || !isLocalDependencySpec(spec)) {
+        return [name, spec];
+      }
+
+      const version = await readLocalDependencyVersion(spec);
+      return [name, `^${version}`];
+    }),
+  );
+
+  return Object.fromEntries(entries);
+};
+
+const publishDependencies = await normalizePublishDependencies(
+  rootPackage.dependencies,
+);
+
 const publishPackage = {
   name: rootPackage.name,
   version: rootPackage.version,
@@ -27,7 +59,7 @@ const publishPackage = {
   homepage: rootPackage.homepage,
   keywords: rootPackage.keywords,
   sideEffects: rootPackage.sideEffects,
-  dependencies: rootPackage.dependencies,
+  dependencies: publishDependencies,
   peerDependencies: rootPackage.peerDependencies,
   files: rootPackage.files,
 };

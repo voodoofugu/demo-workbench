@@ -47,7 +47,7 @@ function parseArgs(args: string[]): CliOptions {
       [
         "Usage:",
         "demo-workbench-styles build --input <stylesDir> --output <cssOutputDir>",
-        "[--no-isolate-styles]",
+        "[--production-css]",
         "[--asset-url-prefix http://localhost:3000/img/]",
         "[--pages-input <pagesDir>]",
         "[--clean]",
@@ -69,7 +69,7 @@ function parseArgs(args: string[]): CliOptions {
   return {
     inputDir,
     outputDir,
-    isolateStyles: hasFlag(args, ["--no-isolate-styles", "--no-isolate"])
+    compileForWorkbench: hasFlag(args, ["--production-css", "--prod-css"])
       ? false
       : undefined,
     assetUrlPrefix: readFlag(args, ["--asset-url-prefix", "--assetUrlPrefix"]),

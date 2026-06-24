@@ -52,6 +52,11 @@ test("package-prepare creates a package with valid root and node export targets"
   );
   assert.equal(pkg.bin["demo-workbench-styles"], "./dist/node/cli.js");
   assert.deepEqual(pkg.typesVersions["*"].node, ["./dist/node/index.d.ts"]);
+  assert.equal(pkg.dependencies["styled-atom"], "^3.0.0-beta.0");
+
+  for (const [name, spec] of Object.entries(pkg.dependencies ?? {})) {
+    assert.doesNotMatch(spec, /^(?:file:|\.{1,2}\/|\/)/, name);
+  }
 });
 
 test("publish package contains exactly one workbench css artifact", async () => {

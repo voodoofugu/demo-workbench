@@ -1,9 +1,9 @@
 import type { ComponentType } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
-  ImportStyleResultT,
-  ImportStyleT,
-  StyleAtomCssReplacementT,
+  ImportStyleResult,
+  ImportStyle,
+  StyleAtomCssReplacement,
 } from "styled-atom";
 
 import workbenchCss from "../styles/workbenchCss";
@@ -91,10 +91,10 @@ async function loadStyleFromReloadServer(
 async function loadStyleReplacements(
   styleReloadUrl: string,
   fileNames: readonly string[],
-): Promise<StyleAtomCssReplacementT[]> {
+): Promise<StyleAtomCssReplacement[]> {
   return Promise.all(
     fileNames.map(async (fileName) => ({
-      fileName,
+      file: fileName,
       css: await loadStyleFromReloadServer(styleReloadUrl, fileName),
     })),
   );
@@ -110,35 +110,17 @@ async function loadStyleReloadUrlFromManifest(manifestUrl: string) {
     styleReloadUrl?: unknown;
   };
 
-  return manifest.enabled === true && typeof manifest.styleReloadUrl === "string"
+  return manifest.enabled === true &&
+    typeof manifest.styleReloadUrl === "string"
     ? manifest.styleReloadUrl
     : undefined;
 }
 
-function WorkbenchGlobalStyles({
-  hostFileNames,
-  baseCss,
-  baseCssLayer,
-}: {
-  hostFileNames: string[];
-  baseCss?: string;
-  baseCssLayer?: string;
-}) {
+function WorkbenchGlobalStyles({ hostFileNames }: { hostFileNames: string[] }) {
   return (
     <>
-      <StyledAtom
-        fileNames={[WORKBENCH_STYLE_ATOM]}
-        layer="workbench"
-        encap={{ content: false }}
-      />
-      {baseCss ? <StyledAtom layer={baseCssLayer} css={baseCss} /> : null}
-      {hostFileNames.length ? (
-        <StyledAtom
-          fileNames={hostFileNames}
-          layer={baseCssLayer}
-          encap={{ content: false }}
-        />
-      ) : null}
+      <StyledAtom files={WORKBENCH_STYLE_ATOM} />
+      {hostFileNames.length ? <StyledAtom files={hostFileNames} /> : null}
     </>
   );
 }
@@ -166,8 +148,6 @@ export default function DemoWorkbench({
   styleReloadUrl,
   styleReloadManifestUrl,
   baseCssFiles,
-  baseCssLayer,
-  baseCss,
   storageData = defaultStorageData,
   viewport = defaultViewport,
   initialState,
@@ -183,7 +163,9 @@ export default function DemoWorkbench({
   const directStyleReloadUrl =
     styleReloadUrl === false ? undefined : styleReloadUrl;
   const resolvedStyleReloadUrl =
-    styleReloadUrl === undefined ? manifestStyleReloadUrl : directStyleReloadUrl;
+    styleReloadUrl === undefined
+      ? manifestStyleReloadUrl
+      : directStyleReloadUrl;
   const styleLoaderRef = useRef(resolvedStyleLoader);
   const styleReloadUrlRef = useRef(resolvedStyleReloadUrl);
 
@@ -238,7 +220,7 @@ export default function DemoWorkbench({
     };
   }, [styleReloadManifestUrl, styleReloadUrl]);
 
-  const loadStyle = useCallback<ImportStyleT>(async (fileName: string) => {
+  const loadStyle = useCallback<ImportStyle>(async (fileName: string) => {
     if (fileName === WORKBENCH_STYLE_ATOM) {
       return Promise.resolve({ default: workbenchCss });
     }
@@ -252,15 +234,12 @@ export default function DemoWorkbench({
       }
     }
 
-    return (await styleLoaderRef.current(fileName)) as ImportStyleResultT;
+    return (await styleLoaderRef.current(fileName)) as ImportStyleResult;
   }, []);
 
   useEffect(() => {
-    workbenchStyleAtoms.configure({
-      path: loadStyle,
-      layers: baseCssLayer ? ["workbench", baseCssLayer] : ["workbench"],
-    });
-  }, [baseCssLayer, loadStyle]);
+    workbenchStyleAtoms.configure(loadStyle);
+  }, [loadStyle]);
 
   useEffect(() => {
     if (
@@ -348,11 +327,7 @@ export default function DemoWorkbench({
 
   return (
     <WorkbenchStateProvider initialState={restoredInitialState}>
-      <WorkbenchGlobalStyles
-        hostFileNames={hostCssFiles}
-        baseCss={baseCss}
-        baseCssLayer={baseCssLayer}
-      />
+      <WorkbenchGlobalStyles hostFileNames={hostCssFiles} />
       <WorkbenchTitle title={title} />
       <TypedWorkbenchStorage storageData={storageData} />
       <TypedWorkbenchShell

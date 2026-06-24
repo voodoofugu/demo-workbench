@@ -5,7 +5,7 @@ import type { ComponentType, ReactNode } from "react";
  * ### ***DemoModule***:
  * module shape returned by a demo loader.
  * @description
- * A demo module must expose a default React component. Optional `cssFiles` are loaded through `styled-atom` before the preview is rendered. `css` is kept as a legacy alias for older manifests.
+ * A demo module must expose a default React component. Optional `cssFiles` are loaded through `styled-atom` before the preview is rendered.
  * @example
  * ```ts
  * const module: DemoModule = await import("./demos/ButtonDemo");
@@ -14,12 +14,7 @@ import type { ComponentType, ReactNode } from "react";
 export type DemoModule = {
   /** Demo component rendered inside the workbench cell and opened-demo modal. */
   default: ComponentType<{ pageName?: string; children?: ReactNode }>;
-  /**
-   * Legacy styled-atom CSS file names used by the demo.
-   * @deprecated Use `cssFiles`.
-   */
-  css?: string[];
-  /** Preferred styled-atom CSS file names used by the demo. */
+  /** Styled-atom CSS file names used by the demo. */
   cssFiles?: string[];
 };
 
@@ -47,12 +42,7 @@ export type DemoItem = {
   title?: string;
   /** Lazy loader for the demo module. Usually `() => import("./MyDemo")`. */
   load: () => Promise<DemoModule>;
-  /**
-   * Legacy styled-atom CSS file names loaded for this demo preview.
-   * @deprecated Use `cssFiles`.
-   */
-  css?: string[];
-  /** Preferred styled-atom CSS file names loaded for this demo preview. */
+  /** Styled-atom CSS file names loaded for this demo preview. */
   cssFiles?: string[];
 };
 
@@ -181,10 +171,6 @@ export type DemoWorkbenchProps = {
   styleReloadManifestUrl?: string | false;
   /** Host-level styled-atom CSS files loaded by the workbench shell. */
   baseCssFiles?: string[];
-  /** Optional cascade layer for host CSS files. No layer is used when omitted. */
-  baseCssLayer?: string;
-  /** Inline CSS to apply to the workbench shell. */
-  baseCss?: string;
   /** Storage fields that should be persisted between reloads. */
   storageData?: DemoWorkbenchStorageEntry[];
   /** Base viewport used for modal scaling. */

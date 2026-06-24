@@ -207,18 +207,12 @@ const DemoCell = memo(function DemoCell({
 
   const content = stableCssFiles.length ? (
     <StyledAtom
-      fileNames={stableCssFiles}
+      files={stableCssFiles}
       fallback={<Loading />}
       encap={{
         attribute: { [scopeAttributeName]: "" },
         className: scopeClassName || undefined,
       }}
-      css={`
-        .likeBody {
-          color-scheme: dark;
-          min-height: 100%;
-        }
-      `}
     >
       {body}
     </StyledAtom>

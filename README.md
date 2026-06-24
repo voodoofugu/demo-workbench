@@ -102,8 +102,6 @@ function DemoWorkbench(props: DemoWorkbenchProps): JSX.Element;
 - `styleReloadUrl?: string | false` - optional dev-only SSE URL used to reload mounted style atoms after watch rebuilds.
 - `styleReloadManifestUrl?: string | false` - optional generated manifest URL that auto-enables style reload while the watch script is running.
 - `baseCssFiles?: string[]` - host-level CSS atoms loaded by the shell.
-- `baseCssLayer?: string` - cascade layer for host CSS.
-- `baseCss?: string` - raw host CSS injected once before `baseCssFiles` in the same layer.
 - `storageData?: DemoWorkbenchStorageEntry[]` - fields that should persist between reloads.
 - `viewport?: { width: number; height: number }` - base preview viewport used for modal scaling.
 - `initialState?: DemoWorkbenchInitialState` - state applied before storage restoration.
@@ -144,7 +142,7 @@ console.log(result.demos?.names);
 
 <b>Description:</b><em><br />
 Runs the requested compile sections and returns the same top-level shape: <code>{ styles, demos }</code>.<br />
-Styles are compiled from top-level <code>.css</code>, <code>.scss</code> and <code>.sass</code> files, isolated under <code>[workbench-scope]</code> plus a generated CSS file class by default, minified, and written as <code>.css</code> files. For example, <code>screen.scss</code> selectors are scoped under <code>[workbench-scope].screen</code>, while <code>01-all.scss</code> uses the safe class <code>[workbench-scope].css-01-all</code>. Pass <code>isolateStyles: false</code> when compiling production CSS that should keep its original selectors. Demo names are discovered from file basenames and written to the generated workbench registry when a target is available.
+Styles are compiled from top-level <code>.css</code>, <code>.scss</code> and <code>.sass</code> files, minified, and written as <code>.css</code> files. By default they are compiled for the workbench runtime: selectors are scoped under <code>[workbench-scope]</code> plus a generated CSS file class, and each output file gets a <code>sourceURL</code> comment so DevTools can show the style filename during development. For example, <code>screen.scss</code> selectors are scoped under <code>[workbench-scope].screen</code>, while <code>01-all.scss</code> uses the safe class <code>[workbench-scope].css-01-all</code>. Pass <code>compileForWorkbench: false</code> when compiling production CSS that should keep its original selectors and omit development-only source hints. Demo names are discovered from file basenames and written to the generated workbench registry when a target is available.
 </em><br />
 
 <b>Signature:</b><br />
@@ -288,25 +286,6 @@ Convenience wrapper around <code>workbenchCompile</code> for scripts that primar
 
 ### Common patterns
 
-<details><summary><b>Local package development</b>: <em>use the workbench from a sibling project</em></summary><br />
-
-```json
-{
-  "dependencies": {
-    "demo-workbench": "file:../demo-workbench"
-  }
-}
-```
-
-Run the package build after changing `demo-workbench`, then reinstall or refresh the host project if needed.
-
-```bash
-cd ../demo-workbench
-npm run build
-```
-
-</details>
-
 <details><summary><b>Project CSS loading</b>: <em>keep host styles controlled by the host app</em></summary><br />
 
 ```tsx
@@ -315,13 +294,10 @@ npm run build
   styleLoader={(name) => import(`../styles/${name}.css`)}
   styleReloadManifestUrl="/workbench-css/demo-workbench-style-reload.json"
   baseCssFiles={["output", "theme"]}
-  baseCss={`
-    [workbench-scope] {
-      min-height: 100%;
-    }
-  `}
 />
 ```
+
+Put cascade layers, variables, resets and preview-wrapper rules inside those CSS files.
 
 </details>
 

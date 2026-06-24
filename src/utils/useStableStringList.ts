@@ -7,7 +7,7 @@ function areStringListsEqual(left: readonly string[], right: readonly string[]) 
 /**
  * Keeps array identity stable while the string contents stay the same.
  *
- * `styled-atom` treats the `fileNames` array as an effect dependency. Host apps
+ * `styled-atom` treats the `files` array as an effect dependency. Host apps
  * often pass inline arrays/functions from render, so preserving the previous
  * array reference prevents redundant style-store updates during scroll and other
  * unrelated React re-renders.
