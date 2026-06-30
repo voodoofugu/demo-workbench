@@ -6,10 +6,12 @@ import test from "node:test";
 
 import {
   discoverWorkbenchFileNames,
-  WORKBENCH_STYLE_RELOAD_MANIFEST_FILE,
+  runWorkbenchCompile,
   watchWorkbenchCompile,
   workbenchCompile,
 } from "../dist/node/index.js";
+
+const STYLE_RELOAD_MANIFEST_FILE = "demo-workbench-style-reload.json";
 
 async function withTempDir(fn) {
   const dir = await mkdtemp(path.join(os.tmpdir(), "demo-workbench-styles-"));
@@ -35,6 +37,23 @@ async function restoreFileSnapshot({ filePath, content }) {
   }
 
   await writeFile(filePath, content);
+}
+
+async function captureConsoleLog(fn) {
+  const messages = [];
+  const originalLog = console.log;
+
+  console.log = (...args) => {
+    messages.push(args.join(" "));
+  };
+
+  try {
+    await fn(messages);
+  } finally {
+    console.log = originalLog;
+  }
+
+  return messages;
 }
 
 test("workbenchCompile scopes demo css, rewrites root selectors, url assets, and minifies output", async () => {
@@ -70,7 +89,7 @@ test("workbenchCompile scopes demo css, rewrites root selectors, url assets, and
     assert.deepEqual(
       JSON.parse(
         await readFile(
-          path.join(outputDir, WORKBENCH_STYLE_RELOAD_MANIFEST_FILE),
+          path.join(outputDir, STYLE_RELOAD_MANIFEST_FILE),
           "utf8",
         ),
       ).enabled,
@@ -149,6 +168,86 @@ test("workbenchCompile can emit production css without workbench isolation", asy
     assert.match(css, /\.card\{color:#00f\}/);
     assert.doesNotMatch(css, /\[workbench-scope\]/);
     assert.doesNotMatch(css, /sourceURL=/);
+  });
+});
+
+test("workbenchCompile prints build summaries only when logs is true", async () => {
+  await withTempDir(async (dir) => {
+    const inputDir = path.join(dir, "input");
+    const outputDir = path.join(dir, "output");
+    await mkdir(inputDir, { recursive: true });
+    await writeFile(path.join(inputDir, "one.scss"), `.one { color: blue; }\n`);
+
+    const quietMessages = await captureConsoleLog(async () => {
+      await workbenchCompile({
+        styles: { inputDir, outputDir },
+      });
+    });
+    assert.deepEqual(quietMessages, []);
+
+    const loggedMessages = await captureConsoleLog(async () => {
+      await workbenchCompile({
+        styles: { inputDir, outputDir },
+        logs: true,
+      });
+    });
+    assert.deepEqual(loggedMessages, [
+      "📋 demo-workbench: styles compiled 1 file(s)",
+    ]);
+  });
+});
+
+test("runWorkbenchCompile reads args and logs command output by default", async () => {
+  await withTempDir(async (dir) => {
+    const inputDir = path.join(dir, "input");
+    const outputDir = path.join(dir, "output");
+    await mkdir(inputDir, { recursive: true });
+    await writeFile(path.join(inputDir, "one.scss"), `.one { color: blue; }\n`);
+
+    const messages = await captureConsoleLog(async () => {
+      await runWorkbenchCompile({
+        args: [],
+        styles: { inputDir, outputDir },
+      });
+    });
+
+    assert.deepEqual(messages, [
+      "📋 demo-workbench: styles compiled 1 file(s)",
+    ]);
+  });
+});
+
+test("runWorkbenchCompile switches to watch mode from args", async () => {
+  await withTempDir(async (dir) => {
+    const inputDir = path.join(dir, "input");
+    const outputDir = path.join(dir, "output");
+    await mkdir(inputDir, { recursive: true });
+    await writeFile(path.join(inputDir, "one.scss"), `.one { color: blue; }\n`);
+
+    await captureConsoleLog(async (messages) => {
+      const result = await runWorkbenchCompile({
+        args: ["--watch"],
+        debounceMs: 20,
+        styleReload: { port: 0 },
+        styles: { inputDir, outputDir },
+      });
+
+      assert.ok(result && "watcher" in result);
+      try {
+        await new Promise((resolve) => result.watcher.once("ready", resolve));
+        assert.match(
+          result.styleReloadUrl,
+          /^http:\/\/127\.0\.0\.1:\d+\/demo-workbench-style-events$/,
+        );
+        assert.ok(
+          messages.some((message) =>
+            message.startsWith("📋 demo-workbench: watching "),
+          ),
+        );
+      } finally {
+        await result.close();
+      }
+    });
   });
 });
 
@@ -372,56 +471,80 @@ test("watchWorkbenchCompile serves fresh css through the style reload endpoint",
 
     const builds = [];
     builds.waiters = [];
-    const watch = await watchWorkbenchCompile({
-      styles: { inputDir, outputDir },
-      debounceMs: 20,
-      styleReload: { port: 0 },
-      onBuild: (result) => {
-        builds.push(result);
-        for (const waiter of builds.waiters.splice(0)) waiter();
-      },
-    });
+    await captureConsoleLog(async (messages) => {
+      const watch = await watchWorkbenchCompile({
+        styles: { inputDir, outputDir },
+        debounceMs: 20,
+        logs: true,
+        styleReload: { port: 0 },
+        onBuild: (result) => {
+          builds.push(result);
+          for (const waiter of builds.waiters.splice(0)) waiter();
+        },
+      });
 
-    try {
-      await new Promise((resolve) => watch.watcher.once("ready", resolve));
-      assert.match(watch.styleReloadUrl, /^http:\/\/127\.0\.0\.1:\d+\/demo-workbench-style-events$/);
-      const enabledManifest = JSON.parse(
-        await readFile(
-          path.join(outputDir, WORKBENCH_STYLE_RELOAD_MANIFEST_FILE),
-          "utf8",
-        ),
-      );
-      assert.equal(enabledManifest.enabled, true);
-      assert.equal(enabledManifest.styleReloadUrl, watch.styleReloadUrl);
-      assert.match(enabledManifest.updatedAt, /^\d{4}-\d{2}-\d{2}T/);
-
-      const styleUrl = new URL(watch.styleReloadUrl);
-      styleUrl.searchParams.set("style", "one");
-      let response = await fetch(styleUrl);
-      assert.equal(response.status, 200);
-      assert.match(await response.text(), /color:#00f/);
-
-      await writeFile(
-        path.join(inputDir, "one.scss"),
-        `.one { color: green; }\n`,
-      );
-      await waitForBuild(builds, 2);
-
-      styleUrl.searchParams.set("v", "2");
-      response = await fetch(styleUrl);
-      assert.equal(response.status, 200);
-      assert.match(await response.text(), /green/);
-    } finally {
-      await watch.close();
-      assert.equal(
-        JSON.parse(
+      try {
+        await new Promise((resolve) => watch.watcher.once("ready", resolve));
+        assert.match(
+          watch.styleReloadUrl,
+          /^http:\/\/127\.0\.0\.1:\d+\/demo-workbench-style-events$/,
+        );
+        assert.ok(
+          messages.some((message) =>
+            message.startsWith("📋 demo-workbench: watching "),
+          ),
+        );
+        assert.ok(
+          messages.includes(
+            `📋 demo-workbench: style reload stream ${watch.styleReloadUrl}`,
+          ),
+        );
+        assert.ok(
+          messages.includes(
+            "📋 demo-workbench: styles compiled 1 file(s)",
+          ),
+        );
+        const enabledManifest = JSON.parse(
           await readFile(
-            path.join(outputDir, WORKBENCH_STYLE_RELOAD_MANIFEST_FILE),
+            path.join(outputDir, STYLE_RELOAD_MANIFEST_FILE),
             "utf8",
           ),
-        ).enabled,
-        false,
-      );
-    }
+        );
+        assert.equal(enabledManifest.enabled, true);
+        assert.equal(enabledManifest.styleReloadUrl, watch.styleReloadUrl);
+        assert.match(enabledManifest.updatedAt, /^\d{4}-\d{2}-\d{2}T/);
+
+        const styleUrl = new URL(watch.styleReloadUrl);
+        styleUrl.searchParams.set("style", "one");
+        let response = await fetch(styleUrl);
+        assert.equal(response.status, 200);
+        assert.match(await response.text(), /color:#00f/);
+
+        await writeFile(
+          path.join(inputDir, "one.scss"),
+          `.one { color: green; }\n`,
+        );
+        await waitForBuild(builds, 2);
+        assert.ok(
+          messages.includes('📋 demo-workbench: style "one.css" compiled'),
+        );
+
+        styleUrl.searchParams.set("v", "2");
+        response = await fetch(styleUrl);
+        assert.equal(response.status, 200);
+        assert.match(await response.text(), /green/);
+      } finally {
+        await watch.close();
+        assert.equal(
+          JSON.parse(
+            await readFile(
+              path.join(outputDir, STYLE_RELOAD_MANIFEST_FILE),
+              "utf8",
+            ),
+          ).enabled,
+          false,
+        );
+      }
+    });
   });
 });

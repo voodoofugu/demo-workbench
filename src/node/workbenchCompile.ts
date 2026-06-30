@@ -90,12 +90,13 @@ export type WorkbenchCompileDemoOptions = {
  * ### ***WorkbenchCompileOptions***:
  * top-level compile options.
  * @description
- * Pass only the sections a host project wants `demo-workbench` to manage. `styles` and `demos` can be used independently or together.
+ * Pass only the sections a host project wants `demo-workbench` to manage. `styles` and `demos` can be used independently or together. Set `logs: true` for built-in progress output and visible Sass warnings.
  * @example
  * ```ts
  * await workbenchCompile({
  *   styles: { inputDir: "styles/scss", outputDir: "src/workbench-css" },
  *   demos: { inputDir: "src/components/pages" },
+ *   logs: true,
  * });
  * ```
  */
@@ -104,6 +105,8 @@ export type WorkbenchCompileOptions = {
   styles?: WorkbenchCompileStylesOptions;
   /** Optional demo page registry section. */
   demos?: WorkbenchCompileDemoOptions;
+  /** Print build summaries and keep Sass warnings/debug messages visible. Defaults to `false`. */
+  logs?: boolean;
 };
 
 /**---
@@ -157,13 +160,14 @@ export type WorkbenchCompileResult = {
  * ### ***WorkbenchCompileWatchOptions***:
  * watch-mode compile options.
  * @description
- * Extends `WorkbenchCompileOptions` with extra watch paths, debounce, style reload and lifecycle callbacks. The first build is always a full compile.
+ * Extends `WorkbenchCompileOptions` with extra watch paths, debounce, style reload and lifecycle callbacks. The first build is always a full compile. Pass `logs: true` to print built-in progress output instead of wiring `onBuild` only for logging.
  * @example
  * ```ts
  * await watchWorkbenchCompile({
  *   styles: { inputDir: "styles/scss", outputDir: "src/workbench-css" },
  *   demos: { inputDir: "src/components/pages" },
  *   styleReload: true,
+ *   logs: true,
  * });
  * ```
  */
@@ -182,6 +186,27 @@ export type WorkbenchCompileWatchOptions = WorkbenchCompileOptions & {
 
 /**---
  * ## ![logo](https://github.com/voodoofugu/demo-workbench/raw/main/src/assets/demo-workbench-logo.png)
+ * ### ***WorkbenchCompileCommandOptions***:
+ * command-style compile options.
+ * @description
+ * Used by `runWorkbenchCompile` for tiny host scripts. It reads CLI args, runs a single compile by default, switches to watch mode for `--watch` or `watch`, and owns error/signal handling.
+ * @example
+ * ```ts
+ * runWorkbenchCompile({
+ *   styles: { inputDir: "styles/scss", outputDir: "src/workbench-css" },
+ *   demos: { inputDir: "src/components/pages" },
+ * });
+ * ```
+ */
+export type WorkbenchCompileCommandOptions = WorkbenchCompileWatchOptions & {
+  /** CLI args to inspect for `--watch` or `watch`. Defaults to `process.argv.slice(2)`. */
+  args?: readonly string[];
+  /** Force command watch mode instead of reading `args`. */
+  watch?: boolean;
+};
+
+/**---
+ * ## ![logo](https://github.com/voodoofugu/demo-workbench/raw/main/src/assets/demo-workbench-logo.png)
  * ### ***WorkbenchStyleReloadOptions***:
  * options for the dev-only style reload endpoint.
  * @description
@@ -196,14 +221,7 @@ export type WorkbenchStyleReloadOptions = {
   path?: string;
 };
 
-/**---
- * ## ![logo](https://github.com/voodoofugu/demo-workbench/raw/main/src/assets/demo-workbench-logo.png)
- * ### ***WorkbenchStyleReloadManifest***:
- * small JSON manifest written next to compiled workbench CSS.
- * @description
- * `DemoWorkbench` can poll this manifest through `styleReloadManifestUrl` and connect to the reload stream only while a watch script is alive.
- */
-export type WorkbenchStyleReloadManifest = {
+type WorkbenchStyleReloadManifest = {
   enabled: boolean;
   styleReloadUrl?: string;
   updatedAt: string;
@@ -543,7 +561,57 @@ function appendStyleSourceUrl(css: Uint8Array, outputFile: string) {
   return Buffer.from(`${cssText}\n${sourceUrl}`);
 }
 
-async function compileInputFile(inputPath: string, inputDir: string) {
+function shouldPrintLogs(options: Pick<WorkbenchCompileOptions, "logs">) {
+  return options.logs === true;
+}
+
+const WORKBENCH_LOG_PREFIX = "📋 demo-workbench:";
+
+function formatUnknownError(error: unknown) {
+  return error instanceof Error ? error.message : error;
+}
+
+function printWorkbenchCompileError(error: unknown, logs: boolean) {
+  const message = formatUnknownError(error);
+  console.error(logs ? `${WORKBENCH_LOG_PREFIX} ${message}` : message);
+}
+
+function isStyleUnlink(file: WorkbenchCompileStyleFile, events: StyleCompileEvent[]) {
+  return events.some(
+    (event) =>
+      event.event === "unlink" &&
+      toOutputFile(path.basename(event.inputPath)) === file.outputFile,
+  );
+}
+
+function printWorkbenchCompileResult(
+  result: WorkbenchCompileResult,
+  events: StyleCompileEvent[] = [],
+) {
+  if (result.styles) {
+    if (events.length && result.styles.files.length === 1) {
+      const [file] = result.styles.files;
+      const action = isStyleUnlink(file, events) ? "removed" : "compiled";
+      console.log(`${WORKBENCH_LOG_PREFIX} style "${file.outputFile}" ${action}`);
+    } else {
+      console.log(
+        `${WORKBENCH_LOG_PREFIX} styles compiled ${result.styles.files.length} file(s)`,
+      );
+    }
+  }
+
+  if (result.demos) {
+    console.log(
+      `${WORKBENCH_LOG_PREFIX} pages discovered ${result.demos.names.length} file(s)`,
+    );
+  }
+}
+
+async function compileInputFile(
+  inputPath: string,
+  inputDir: string,
+  logs: boolean,
+) {
   const ext = path.extname(inputPath).toLowerCase();
   if (ext === ".css") {
     return readFile(inputPath, "utf8");
@@ -551,6 +619,7 @@ async function compileInputFile(inputPath: string, inputDir: string) {
 
   const result = await sass.compileAsync(inputPath, {
     loadPaths: [inputDir],
+    logger: logs ? undefined : sass.Logger.silent,
     style: "expanded",
   });
 
@@ -714,12 +783,13 @@ async function compileStyleFile(
   inputDir: string,
   outputDir: string,
   inputPath: string,
+  logs: boolean,
 ): Promise<WorkbenchCompileStyleFile> {
   const styleFile = getStyleFileResult(inputDir, outputDir, inputPath);
 
   let compiledCss: string;
   try {
-    compiledCss = await compileInputFile(inputPath, inputDir);
+    compiledCss = await compileInputFile(inputPath, inputDir, logs);
   } catch (error) {
     throw new Error(
       `Failed to compile ${styleFile.inputFile}: ${error instanceof Error ? error.message : String(error)}`,
@@ -772,6 +842,7 @@ function dedupeStyleEvents(events: StyleCompileEvent[]) {
 
 async function compileStyles(
   options: WorkbenchCompileStylesOptions,
+  logs: boolean,
   events?: StyleCompileEvent[],
 ): Promise<WorkbenchCompileStylesResult> {
   const inputDir = path.resolve(options.inputDir);
@@ -800,7 +871,13 @@ async function compileStyles(
       }
 
       files.push(
-        await compileStyleFile(options, inputDir, outputDir, event.inputPath),
+        await compileStyleFile(
+          options,
+          inputDir,
+          outputDir,
+          event.inputPath,
+          logs,
+        ),
       );
     }
 
@@ -811,7 +888,9 @@ async function compileStyles(
 
   for (const inputFile of inputFiles) {
     const inputPath = path.join(inputDir, inputFile);
-    files.push(await compileStyleFile(options, inputDir, outputDir, inputPath));
+    files.push(
+      await compileStyleFile(options, inputDir, outputDir, inputPath, logs),
+    );
   }
 
   return { inputDir, outputDir, files };
@@ -831,14 +910,16 @@ async function compileStyles(
  *     outputDir: "src/styles/workbench-css",
  *   },
  *   demos: { inputDir: "src/components/pages" },
+ *   logs: true,
  * });
  * ```
  */
-export async function workbenchCompile(
+async function compileWorkbench(
   options: WorkbenchCompileOptions,
 ): Promise<WorkbenchCompileResult> {
+  const logs = shouldPrintLogs(options);
   const styles = options.styles
-    ? await compileStyles(options.styles)
+    ? await compileStyles(options.styles, logs)
     : undefined;
   if (styles) {
     await writeStyleReloadManifest(styles.outputDir, { enabled: false });
@@ -846,6 +927,18 @@ export async function workbenchCompile(
   const registry = await compileGeneratedRegistry(options);
 
   return { styles, ...registry };
+}
+
+export async function workbenchCompile(
+  options: WorkbenchCompileOptions,
+): Promise<WorkbenchCompileResult> {
+  const result = await compileWorkbench(options);
+
+  if (shouldPrintLogs(options)) {
+    printWorkbenchCompileResult(result);
+  }
+
+  return result;
 }
 
 /**---
@@ -891,15 +984,7 @@ function hasCompileResult(result: WorkbenchCompileResult) {
 const DEFAULT_STYLE_RELOAD_PORT = 38297;
 const DEFAULT_STYLE_RELOAD_HOST = "127.0.0.1";
 const DEFAULT_STYLE_RELOAD_PATH = "/demo-workbench-style-events";
-/**---
- * ## ![logo](https://github.com/voodoofugu/demo-workbench/raw/main/src/assets/demo-workbench-logo.png)
- * ### ***WORKBENCH_STYLE_RELOAD_MANIFEST_FILE***:
- * file name used for the generated style reload manifest.
- * @description
- * `watchWorkbenchCompile` writes this JSON file into the compiled style output directory so `DemoWorkbench` can discover the active reload server through `styleReloadManifestUrl`.
- */
-export const WORKBENCH_STYLE_RELOAD_MANIFEST_FILE =
-  "demo-workbench-style-reload.json";
+const STYLE_RELOAD_MANIFEST_FILE = "demo-workbench-style-reload.json";
 
 type WorkbenchStyleReloadServer = {
   url: string;
@@ -927,7 +1012,7 @@ async function writeStyleReloadManifest(
 ) {
   const outputFile = path.resolve(
     outputDir,
-    WORKBENCH_STYLE_RELOAD_MANIFEST_FILE,
+    STYLE_RELOAD_MANIFEST_FILE,
   );
 
   await mkdir(path.dirname(outputFile), { recursive: true });
@@ -963,10 +1048,18 @@ async function createStyleReloadServer(
   const update = async (files: WorkbenchCompileStyleFile[]) => {
     await Promise.all(
       files.map(async (file) => {
-        cssByFileName.set(
-          getFileName(file),
-          await readFile(file.outputPath, "utf8"),
-        );
+        const fileName = getFileName(file);
+
+        try {
+          cssByFileName.set(fileName, await readFile(file.outputPath, "utf8"));
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+            cssByFileName.delete(fileName);
+            return;
+          }
+
+          throw error;
+        }
       }),
     );
   };
@@ -1057,7 +1150,7 @@ async function compileWatchEvents(
   events: StyleCompileEvent[],
   extraWatchPaths: string[],
 ): Promise<WorkbenchCompileResult> {
-  if (!events.length) return workbenchCompile(options);
+  if (!events.length) return compileWorkbench(options);
 
   const hasExtraChange = events.some((event) =>
     extraWatchPaths.some(
@@ -1066,7 +1159,7 @@ async function compileWatchEvents(
         isPathInDirectory(event.inputPath, watchPath),
     ),
   );
-  if (hasExtraChange) return workbenchCompile(options);
+  if (hasExtraChange) return compileWorkbench(options);
 
   const styleEvents = options.styles
     ? events.filter(
@@ -1095,9 +1188,13 @@ async function compileWatchEvents(
 
   const styles = options.styles
     ? styleDependencyChanged
-      ? await compileStyles(options.styles)
+      ? await compileStyles(options.styles, shouldPrintLogs(options))
       : styleEvents.length
-        ? await compileStyles(options.styles, styleEvents)
+        ? await compileStyles(
+            options.styles,
+            shouldPrintLogs(options),
+            styleEvents,
+          )
         : undefined
     : undefined;
   const registry = demoFileListChanged
@@ -1113,7 +1210,7 @@ async function compileWatchEvents(
  * ### ***watchWorkbenchCompile***:
  * watch host project files and rebuild only what changed.
  * @description
- * Starts with one full compile. Direct changes to one top-level style file recompile only that file. Sass partial changes trigger a full style compile, and demo file changes regenerate only the registry section. When `styleReload` is enabled, changed CSS can be pushed into mounted workbench previews.
+ * Starts with one full compile. Direct changes to one top-level style file recompile only that file. Sass partial changes trigger a full style compile, and demo file changes regenerate only the registry section. When `styleReload` is enabled, changed CSS can be pushed into mounted workbench previews. Pass `logs: true` to print watch paths, build summaries and the style reload stream URL.
  * @example
  * ```ts
  * const watch = await watchWorkbenchCompile({
@@ -1122,6 +1219,7 @@ async function compileWatchEvents(
  *     outputDir: "src/styles/workbench-css",
  *   },
  *   styleReload: true,
+ *   logs: true,
  * });
  *
  * await watch.close();
@@ -1145,13 +1243,24 @@ export async function watchWorkbenchCompile(
     compileOptions,
     extraWatchPaths,
   );
+  const logs = shouldPrintLogs(compileOptions);
+
+  if (logs) {
+    console.log(`${WORKBENCH_LOG_PREFIX} watching ${watchPaths.join(", ")}`);
+  }
 
   const styleReloadServer = await createStyleReloadServer(styleReload);
+
+  if (logs && styleReloadServer) {
+    console.log(
+      `${WORKBENCH_LOG_PREFIX} style reload stream ${styleReloadServer.url}`,
+    );
+  }
 
   const runBuild = async (events?: StyleCompileEvent[]) => {
     const result = events?.length
       ? await compileWatchEvents(compileOptions, events, extraWatchPaths)
-      : await workbenchCompile(compileOptions);
+      : await compileWorkbench(compileOptions);
 
     if (events?.length && !hasCompileResult(result)) {
       return result;
@@ -1166,6 +1275,10 @@ export async function watchWorkbenchCompile(
           styleReloadUrl: styleReloadServer.url,
         });
       }
+    }
+
+    if (logs) {
+      printWorkbenchCompileResult(result, events);
     }
 
     await onBuild?.(result);
@@ -1190,11 +1303,14 @@ export async function watchWorkbenchCompile(
 
   let pending: NodeJS.Timeout | null = null;
   let pendingEvents: StyleCompileEvent[] = [];
+  let closed = false;
 
   const scheduleBuild = (
     event: StyleCompileEvent["event"],
     inputPath: string,
   ) => {
+    if (closed) return;
+
     pendingEvents.push({ event, inputPath });
 
     if (pending) clearTimeout(pending);
@@ -1211,7 +1327,7 @@ export async function watchWorkbenchCompile(
           return;
         }
 
-        console.error(error instanceof Error ? error.message : error);
+        printWorkbenchCompileError(error, logs);
       });
     }, debounceMs);
   };
@@ -1225,6 +1341,13 @@ export async function watchWorkbenchCompile(
     styleReloadUrl: styleReloadServer?.url,
 
     close: async () => {
+      closed = true;
+      if (pending) {
+        clearTimeout(pending);
+        pending = null;
+        pendingEvents = [];
+      }
+
       if (compileOptions.styles) {
         await writeStyleReloadManifest(compileOptions.styles.outputDir, {
           enabled: false,
@@ -1235,4 +1358,92 @@ export async function watchWorkbenchCompile(
       await styleReloadServer?.close();
     },
   };
+}
+
+function hasWatchArg(args: readonly string[]) {
+  return args.includes("--watch") || args.includes("watch");
+}
+
+function closeWatcherOnSignal(
+  watcher: WorkbenchCompileWatchResult,
+  logs: boolean,
+) {
+  let isClosing = false;
+  const close = watcher.close;
+  const closeWatcher = async () => {
+    if (isClosing) return;
+    isClosing = true;
+    await watcher.close();
+    process.exit(0);
+  };
+  const handleCloseError = (error: unknown) => {
+    printWorkbenchCompileError(error, logs);
+    process.exit(1);
+  };
+  const handleSigint = () => {
+    closeWatcher().catch(handleCloseError);
+  };
+  const handleSigterm = () => {
+    closeWatcher().catch(handleCloseError);
+  };
+
+  watcher.close = async () => {
+    process.off("SIGINT", handleSigint);
+    process.off("SIGTERM", handleSigterm);
+    await close();
+  };
+
+  process.once("SIGINT", handleSigint);
+  process.once("SIGTERM", handleSigterm);
+}
+
+async function runWorkbenchCompileCommand(
+  options: WorkbenchCompileCommandOptions,
+) {
+  const {
+    args = process.argv.slice(2),
+    watch,
+    logs = true,
+    ...compileOptions
+  } = options;
+  const resolvedOptions = {
+    ...compileOptions,
+    logs,
+  };
+
+  if (!(watch ?? hasWatchArg(args))) {
+    return workbenchCompile(resolvedOptions);
+  }
+
+  const watcher = await watchWorkbenchCompile({
+    ...resolvedOptions,
+    styleReload: resolvedOptions.styleReload ?? true,
+  });
+
+  closeWatcherOnSignal(watcher, logs);
+  return watcher;
+}
+
+/**---
+ * ## ![logo](https://github.com/voodoofugu/demo-workbench/raw/main/src/assets/demo-workbench-logo.png)
+ * ### ***runWorkbenchCompile***:
+ * command-style compile runner for tiny host scripts.
+ * @description
+ * Runs one compile by default and switches to watch mode when `process.argv` contains `--watch` or `watch`. In watch mode it enables style reload by default, owns SIGINT/SIGTERM cleanup, and catches startup errors so a host script can just call this function.
+ * @example
+ * ```ts
+ * import { runWorkbenchCompile } from "demo-workbench/node";
+ *
+ * runWorkbenchCompile({
+ *   styles: { inputDir: "styles/scss", outputDir: "src/workbench-css" },
+ *   demos: { inputDir: "src/components/pages" },
+ * });
+ * ```
+ */
+export function runWorkbenchCompile(options: WorkbenchCompileCommandOptions) {
+  return runWorkbenchCompileCommand(options).catch((error: unknown) => {
+    printWorkbenchCompileError(error, options.logs ?? true);
+    process.exitCode = 1;
+    return undefined;
+  });
 }

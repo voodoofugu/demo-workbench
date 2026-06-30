@@ -24,24 +24,28 @@ const isDependency = (id) =>
 
 const isExternal = (id) => isBuiltin(id) || isDependency(id);
 
-const minify = terser({
-  compress: {
-    passes: 2,
-    unsafe: true,
-    unsafe_arrows: true,
-    unsafe_comps: true,
-    unsafe_math: true,
-    drop_console: true,
-    pure_funcs: ["console.log"],
-  },
-  mangle: {
-    toplevel: true,
-    reserved: ["generatedWorkbenchRegistry"],
-  },
-  output: {
-    comments: false,
-  },
-});
+const createMinify = ({ dropConsole = true } = {}) =>
+  terser({
+    compress: {
+      passes: 2,
+      unsafe: true,
+      unsafe_arrows: true,
+      unsafe_comps: true,
+      unsafe_math: true,
+      drop_console: dropConsole,
+      pure_funcs: dropConsole ? ["console.log"] : [],
+    },
+    mangle: {
+      toplevel: true,
+      reserved: ["generatedWorkbenchRegistry"],
+    },
+    output: {
+      comments: false,
+    },
+  });
+
+const browserMinify = createMinify();
+const nodeMinify = createMinify({ dropConsole: false });
 
 const createJsConfig = ({
   input,
@@ -73,7 +77,7 @@ const createJsConfig = ({
         outDir: path.dirname(output),
       },
     }),
-    minifyCode ? minify : null,
+    minifyCode ? (node ? nodeMinify : browserMinify) : null,
   ].filter(Boolean),
 });
 

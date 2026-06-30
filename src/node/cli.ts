@@ -1,14 +1,9 @@
 #!/usr/bin/env node
-import {
-  getWorkbenchCompileWatchPaths,
-  watchWorkbenchCompile,
-  workbenchCompile,
-} from "./workbenchCompile";
+import { runWorkbenchCompile } from "./workbenchCompile";
 import type {
   WorkbenchCompileOptions,
   WorkbenchCompileStylesOptions,
   WorkbenchStyleReloadOptions,
-  WorkbenchCompileResult,
 } from "./workbenchCompile";
 
 type CliOptions = WorkbenchCompileStylesOptions & {
@@ -86,33 +81,6 @@ function parseArgs(args: string[]): CliOptions {
   };
 }
 
-function printRegistryResult(result: Pick<WorkbenchCompileResult, "demos">) {
-  if (!result.demos) return;
-
-  const outputFiles = result.demos.outputFiles;
-  const target = outputFiles.length
-    ? outputFiles.join(", ")
-    : "internal registry";
-
-  console.log(
-    `demo-workbench registry: stored ${result.demos.names.length} demo(s): ${target}`,
-  );
-}
-
-function printResult(result: WorkbenchCompileResult) {
-  if (result.styles) {
-    const files = result.styles.files.map((file) => file.outputFile).join(", ");
-
-    console.log(
-      `demo-workbench styles: compiled ${result.styles.files.length} file(s)${
-        files ? `: ${files}` : ""
-      }`,
-    );
-  }
-
-  printRegistryResult(result);
-}
-
 function toCompileOptions(options: CliOptions): WorkbenchCompileOptions {
   return {
     styles: {
@@ -127,41 +95,19 @@ function toCompileOptions(options: CliOptions): WorkbenchCompileOptions {
           inputDir: options.demoInputDir,
         }
       : undefined,
+    logs: true,
   };
-}
-
-async function build(options: CliOptions) {
-  const result = await workbenchCompile(toCompileOptions(options));
-  const files = result.styles?.files.map((file) => file.outputFile).join(", ");
-
-  console.log(
-    `demo-workbench styles: compiled ${result.styles?.files.length ?? 0} file(s)${
-      files ? `: ${files}` : ""
-    }`,
-  );
-
-  printRegistryResult(result);
 }
 
 async function main() {
   const options = parseArgs(process.argv.slice(2));
-
-  if (!options.watch) {
-    await build(options);
-    return;
-  }
-
   const compileOptions = toCompileOptions(options);
 
-  const watchPaths = getWorkbenchCompileWatchPaths(compileOptions);
-
-  console.log(`demo-workbench styles: watching ${watchPaths.join(", ")}`);
-
-  await watchWorkbenchCompile({
+  await runWorkbenchCompile({
     ...compileOptions,
     debounceMs: 50,
     styleReload: options.styleReload,
-    onBuild: printResult,
+    watch: options.watch,
   });
 }
 

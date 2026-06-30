@@ -117,14 +117,14 @@ Project-level SVG filters/defs should be rendered by the host app as normal sibl
 
 ###### **— NODE —**
 
-<details><summary><b><code>workbenchCompile</code></b>: <em>compile styles and generated demo registry</em></summary><br /><ul><div>
+<details><summary><b><code>runWorkbenchCompile</code></b>: <em>run a tiny host compile script</em></summary><br /><ul><div>
 
 <b>Usage:</b><br />
 
 ```ts
-import { workbenchCompile } from "demo-workbench/node";
+import { runWorkbenchCompile } from "demo-workbench/node";
 
-const result = await workbenchCompile({
+runWorkbenchCompile({
   styles: {
     inputDir: "titans_rc/styles/scss",
     outputDir: "src/styles/css",
@@ -132,14 +132,44 @@ const result = await workbenchCompile({
   },
   demos: { inputDir: "src/components/pages" },
 });
+```
 
-console.log(result.styles?.files.length);
-console.log(result.demos?.names);
+Run the same script with `--watch` to start watch mode:
+
+```bash
+ts-node src/scripts/workbenchCompile.ts --watch
+```
+
+<b>Description:</b><em><br />
+Reads <code>process.argv</code>, runs one compile by default, and switches to watch mode for <code>--watch</code> or <code>watch</code>. Watch mode enables style reload by default, handles <code>SIGINT</code>/<code>SIGTERM</code> cleanup, and logs command-style output.
+</em><br />
+
+</div></ul></details>
+
+<h2></h2>
+
+<details><summary><b><code>workbenchCompile</code></b>: <em>compile styles and generated demo registry</em></summary><br /><ul><div>
+
+<b>Usage:</b><br />
+
+```ts
+import { workbenchCompile } from "demo-workbench/node";
+
+await workbenchCompile({
+  styles: {
+    inputDir: "titans_rc/styles/scss",
+    outputDir: "src/styles/css",
+    assetUrlPrefix: "http://localhost:3000/img/",
+  },
+  demos: { inputDir: "src/components/pages" },
+  logs: true,
+});
 ```
 
 <b>Description:</b><em><br />
 Runs the requested compile sections and returns the same top-level shape: <code>{ styles, demos }</code>.<br />
 Styles are compiled from top-level <code>.css</code>, <code>.scss</code> and <code>.sass</code> files, minified, and written as <code>.css</code> files. By default they are compiled for the workbench runtime: selectors are scoped under <code>[workbench-scope]</code> plus a generated CSS file class, and each output file gets a <code>sourceURL</code> comment so DevTools can show the style filename during development. For example, <code>screen.scss</code> selectors are scoped under <code>[workbench-scope].screen</code>, while <code>01-all.scss</code> uses the safe class <code>[workbench-scope].css-01-all</code>. Pass <code>compileForWorkbench: false</code> when compiling production CSS that should keep its original selectors and omit development-only source hints. Demo names are discovered from file basenames and written to the generated workbench registry when a target is available.
+Pass <code>logs: true</code> to print built-in build summaries and keep Sass warnings/debug messages visible. Without it, the programmatic compiler stays quiet.
 </em><br />
 
 <b>Signature:</b><br />
@@ -210,16 +240,13 @@ await watchWorkbenchCompile({
   },
   demos: { inputDir: "src/components/pages" },
   styleReload: true,
-  onBuild: (result) => {
-    if (result.styles) {
-      console.log(result.styles.files.map((file) => file.outputFile));
-    }
-  },
+  logs: true,
 });
 ```
 
 <b>Description:</b><em><br />
 Starts with one full compile. After that, direct changes to one top-level style file recompile only that file. Changes to Sass partials such as <code>\_mixins.scss</code> trigger a full style compile because dependency ownership is ambiguous. Demo registry changes are limited to file-list changes such as adding, removing or renaming demo files; editing demo component content is left to the host dev server.
+Pass <code>logs: true</code> to print watch paths, compile summaries, the style reload stream URL and Sass warnings. Rebuild errors are logged by default unless you provide <code>onError</code>.
 </em><br />
 
 <b>Return:</b><br />
@@ -227,7 +254,6 @@ Returns a watcher handle with `styleReloadUrl` when dev reload is enabled and `c
 
 ```ts
 const watch = await watchWorkbenchCompile(options);
-console.log(watch.styleReloadUrl);
 await watch.close();
 ```
 
@@ -248,7 +274,7 @@ const watchPaths = getWorkbenchCompileWatchPaths(options, [
 ```
 
 <b>Description:</b><em><br />
-Returns the style input directory, demo input directory and any extra host paths as a compact string list. Use it when a host script wants to print or extend the same watch surface that <code>watchWorkbenchCompile</code> uses internally.
+Returns the style input directory, demo input directory and any extra host paths as a compact string list. Use it when a host script wants to inspect or extend the same watch surface that <code>watchWorkbenchCompile</code> uses internally.
 </em><br />
 
 </div></ul></details>
@@ -279,30 +305,18 @@ Put cascade layers, variables, resets and preview-wrapper rules inside those CSS
 <details><summary><b>SCSS/style compilation from a host project</b>: <em>keep watch orchestration inside demo-workbench</em></summary><br />
 
 ```ts
-import { watchWorkbenchCompile, workbenchCompile } from "demo-workbench/node";
+import { runWorkbenchCompile } from "demo-workbench/node";
 
-const options = {
+runWorkbenchCompile({
   styles: {
     inputDir: "titans_rc/styles/scss",
     outputDir: "src/styles/css",
   },
   demos: { inputDir: "src/components/pages" },
-};
-
-await workbenchCompile(options);
-const watch = await watchWorkbenchCompile({
-  ...options,
-  styleReload: true,
-  onBuild: (result) => {
-    if (result.styles) console.log("styles", result.styles.files.length);
-    if (result.demos) console.log("demos", result.demos.names.length);
-  },
 });
-
-console.log(watch.styleReloadUrl);
 ```
 
-Host projects should pass their paths/options only; file watching, debouncing and rebuild calls are owned by `demo-workbench/node`.
+Host projects should pass their paths/options only; command args, file watching, debouncing, style reload and shutdown cleanup are owned by `demo-workbench/node`.
 
 </details>
 
@@ -327,6 +341,7 @@ await watchWorkbenchCompile({
 ```
 
 `watchWorkbenchCompile` writes `demo-workbench-style-reload.json` into the style output directory. The browser polls that file and only connects to the reload stream while the watch script is alive.
+The reload URL is a Server-Sent Events stream, so opening `/demo-workbench-style-events` directly in a browser will look like a request that never finishes. That is expected; CSS is fetched from the same endpoint with `?style=<name>`.
 
 </details>
 
