@@ -217,6 +217,25 @@ test("runWorkbenchCompile reads args and logs command output by default", async 
   });
 });
 
+test("runWorkbenchCompile can disable command logs", async () => {
+  await withTempDir(async (dir) => {
+    const inputDir = path.join(dir, "input");
+    const outputDir = path.join(dir, "output");
+    await mkdir(inputDir, { recursive: true });
+    await writeFile(path.join(inputDir, "one.scss"), `.one { color: blue; }\n`);
+
+    const messages = await captureConsoleLog(async () => {
+      await runWorkbenchCompile({
+        args: [],
+        logs: false,
+        styles: { inputDir, outputDir },
+      });
+    });
+
+    assert.deepEqual(messages, []);
+  });
+});
+
 test("runWorkbenchCompile switches to watch mode from args", async () => {
   await withTempDir(async (dir) => {
     const inputDir = path.join(dir, "input");

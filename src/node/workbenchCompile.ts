@@ -189,7 +189,7 @@ export type WorkbenchCompileWatchOptions = WorkbenchCompileOptions & {
  * ### ***WorkbenchCompileCommandOptions***:
  * command-style compile options.
  * @description
- * Used by `runWorkbenchCompile` for tiny host scripts. It reads CLI args, runs a single compile by default, switches to watch mode for `--watch` or `watch`, and owns error/signal handling.
+ * Used by `runWorkbenchCompile` for tiny host scripts. It reads CLI args, runs a single compile by default, switches to watch mode for `--watch` or `watch`, prints command logs by default, and owns error/signal handling.
  * @example
  * ```ts
  * runWorkbenchCompile({
@@ -198,11 +198,16 @@ export type WorkbenchCompileWatchOptions = WorkbenchCompileOptions & {
  * });
  * ```
  */
-export type WorkbenchCompileCommandOptions = WorkbenchCompileWatchOptions & {
+export type WorkbenchCompileCommandOptions = Omit<
+  WorkbenchCompileWatchOptions,
+  "logs"
+> & {
   /** CLI args to inspect for `--watch` or `watch`. Defaults to `process.argv.slice(2)`. */
   args?: readonly string[];
   /** Force command watch mode instead of reading `args`. */
   watch?: boolean;
+  /** Print command logs and keep Sass warnings/debug messages visible. Defaults to `true`. */
+  logs?: boolean;
 };
 
 /**---
@@ -1397,33 +1402,6 @@ function closeWatcherOnSignal(
   process.once("SIGTERM", handleSigterm);
 }
 
-async function runWorkbenchCompileCommand(
-  options: WorkbenchCompileCommandOptions,
-) {
-  const {
-    args = process.argv.slice(2),
-    watch,
-    logs = true,
-    ...compileOptions
-  } = options;
-  const resolvedOptions = {
-    ...compileOptions,
-    logs,
-  };
-
-  if (!(watch ?? hasWatchArg(args))) {
-    return workbenchCompile(resolvedOptions);
-  }
-
-  const watcher = await watchWorkbenchCompile({
-    ...resolvedOptions,
-    styleReload: resolvedOptions.styleReload ?? true,
-  });
-
-  closeWatcherOnSignal(watcher, logs);
-  return watcher;
-}
-
 /**---
  * ## ![logo](https://github.com/voodoofugu/demo-workbench/raw/main/src/assets/demo-workbench-logo.png)
  * ### ***runWorkbenchCompile***:
@@ -1441,8 +1419,32 @@ async function runWorkbenchCompileCommand(
  * ```
  */
 export function runWorkbenchCompile(options: WorkbenchCompileCommandOptions) {
-  return runWorkbenchCompileCommand(options).catch((error: unknown) => {
-    printWorkbenchCompileError(error, options.logs ?? true);
+  const {
+    args = process.argv.slice(2),
+    watch,
+    logs = true,
+    ...compileOptions
+  } = options;
+  const resolvedOptions = {
+    ...compileOptions,
+    logs,
+  };
+  const run = async () => {
+    if (!(watch ?? hasWatchArg(args))) {
+      return workbenchCompile(resolvedOptions);
+    }
+
+    const watcher = await watchWorkbenchCompile({
+      ...resolvedOptions,
+      styleReload: resolvedOptions.styleReload ?? true,
+    });
+
+    closeWatcherOnSignal(watcher, logs);
+    return watcher;
+  };
+
+  return run().catch((error: unknown) => {
+    printWorkbenchCompileError(error, logs);
     process.exitCode = 1;
     return undefined;
   });

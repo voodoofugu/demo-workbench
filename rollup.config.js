@@ -26,7 +26,9 @@ const isExternal = (id) => isBuiltin(id) || isDependency(id);
 
 const createMinify = ({ dropConsole = true } = {}) =>
   terser({
+    ecma: 5,
     compress: {
+      ecma: 5,
       passes: 2,
       unsafe: true,
       unsafe_arrows: true,
@@ -41,6 +43,7 @@ const createMinify = ({ dropConsole = true } = {}) =>
     },
     output: {
       comments: false,
+      ecma: 5,
     },
   });
 
@@ -74,7 +77,9 @@ const createJsConfig = ({
     typescript({
       tsconfig: "./tsconfig.rollup.json",
       compilerOptions: {
+        downlevelIteration: true,
         outDir: path.dirname(output),
+        target: "ES5",
       },
     }),
     minifyCode ? (node ? nodeMinify : browserMinify) : null,
