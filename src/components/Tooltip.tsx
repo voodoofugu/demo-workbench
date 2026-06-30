@@ -14,8 +14,8 @@ type TooltipData = {
   top: number;
   left: number;
   text: string;
-  positionClassX: string;
-  positionClassY?: string;
+  placement: "top" | "bottom" | "side-left" | "side-right";
+  align?: "left" | "center" | "right";
 };
 
 function addTooltipData(
@@ -41,61 +41,50 @@ function addTooltipData(
     text,
     top: 0,
     left: 0,
-    positionClassY: "",
-    positionClassX: "",
+    placement: "bottom",
+    align: "center",
   };
 
   if (position) {
     if (position === "top") {
       newTooltipData.top = top;
-      newTooltipData.positionClassY =
-        "after:border-t-8 after:border-t-indigo-200 dark:after:border-t-indigo-900 after:bottom-[-7px] -translate-y-full mt-[-10px]";
       newTooltipData.left = centerX;
-      newTooltipData.positionClassX =
-        "after:left-1/2 after:-translate-x-1/2 -translate-x-1/2";
+      newTooltipData.placement = "top";
+      newTooltipData.align = "center";
     } else if (position === "bottom") {
       newTooltipData.top = top + height;
-      newTooltipData.positionClassY =
-        "after:border-b-8 after:border-b-indigo-50 dark:after:border-b-indigo-600 after:top-[-7px] mt-[10px]";
       newTooltipData.left = centerX;
-      newTooltipData.positionClassX =
-        "after:left-1/2 after:-translate-x-1/2 -translate-x-1/2";
+      newTooltipData.placement = "bottom";
+      newTooltipData.align = "center";
     } else if (position === "left") {
       newTooltipData.top = centerY;
-      newTooltipData.positionClassY =
-        "after:border-t-8 after:border-t-indigo-50 dark:after:border-t-indigo-700 after:inset-y-1/2 after:-translate-y-1/2 after:rotate-90 -translate-y-1/2";
       newTooltipData.left = left + width;
-      newTooltipData.positionClassX = "after:left-[-11px] ml-[10px]";
+      newTooltipData.placement = "side-left";
+      newTooltipData.align = undefined;
     } else if (position === "right") {
       newTooltipData.top = centerY;
-      newTooltipData.positionClassY =
-        "after:border-b-8 after:border-b-indigo-200 dark:after:border-b-indigo-900 after:inset-y-1/2 after:-translate-y-1/2 after:rotate-90 -translate-y-1/2";
       newTooltipData.left = left;
-      newTooltipData.positionClassX =
-        "after:right-[-11px] -translate-x-full ml-[-10px]";
+      newTooltipData.placement = "side-right";
+      newTooltipData.align = undefined;
     }
   } else {
     if (centerY < halfHeight) {
       newTooltipData.top = top + height;
-      newTooltipData.positionClassY =
-        "after:border-b-8 after:border-b-indigo-50 dark:after:border-b-indigo-600 after:top-[-7px] mt-[10px]";
+      newTooltipData.placement = "bottom";
     } else {
       newTooltipData.top = top;
-      newTooltipData.positionClassY =
-        "after:border-t-8 after:border-t-indigo-200 dark:after:border-t-indigo-900 after:bottom-[-7px] -translate-y-full mt-[-10px]";
+      newTooltipData.placement = "top";
     }
 
     if (centerX < oneThirdWidth) {
       newTooltipData.left = left;
-      newTooltipData.positionClassX = "after:left-16 ml-[-16px]";
+      newTooltipData.align = "left";
     } else if (centerX > oneThirdWidth * 2) {
       newTooltipData.left = left + width;
-      newTooltipData.positionClassX =
-        "after:right-16 -translate-x-full ml-[16px]";
+      newTooltipData.align = "right";
     } else {
       newTooltipData.left = centerX;
-      newTooltipData.positionClassX =
-        "after:left-1/2 after:-translate-x-1/2 -translate-x-1/2";
+      newTooltipData.align = "center";
     }
   }
 
@@ -135,7 +124,7 @@ export default function Tooltip({ children, text, position }: TooltipProps) {
   return (
     <div
       tooltip-layer=""
-      className="w-full h-full"
+      className="demo-workbench-tooltip-target"
       onMouseEnter={(event) =>
         addTooltipData(
           event,
@@ -155,15 +144,10 @@ export default function Tooltip({ children, text, position }: TooltipProps) {
       {render && portalTarget
         ? createPortal(
             <div
-              className={`absolute px-14 py-10 rounded-10 bg-indigo-100 shadow-tooltipTemplate drop-shadow-tooltipDS text-indigo-600 text-shadow-tS1 transition-all1 text-sm font-bold pointer-events-none flex dark:bg-indigo-800 dark:shadow-tooltipTemplateDark dark:text-indigo-400 dark:text-shadow-tS1Black after:w-0 after:h-0 after:absolute z-10 ${
-                tooltipData?.positionClassY
-                  ? `${tooltipData.positionClassY} after:border-x-8 after:border-x-transparent`
-                  : "m-0"
-              } ${tooltipData?.positionClassX ?? ""} ${
-                visible
-                  ? "opacity-100 scale-100"
-                  : "opacity-0 scale-90 mt-[0px]"
-              }`}
+              className="demo-workbench-tooltip"
+              data-visible={visible ? "true" : "false"}
+              data-placement={tooltipData?.placement}
+              data-align={tooltipData?.align}
               style={{
                 top: tooltipData?.top,
                 left: tooltipData?.left,
@@ -171,7 +155,7 @@ export default function Tooltip({ children, text, position }: TooltipProps) {
               id={text}
             >
               <FileIcn
-                className="inline-block w-14 fill-indigo-500 dark:fill-indigo-400 drop-shadow-dS1 dark:drop-shadow-darkDS1 mr-6"
+                className="demo-workbench-tooltip-icon"
                 style={null}
               />
               {tooltipData?.text}

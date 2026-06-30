@@ -1,18 +1,20 @@
 #!/usr/bin/env node
 import {
-  compileWorkbenchStyles,
   getWorkbenchCompileWatchPaths,
   watchWorkbenchCompile,
+  workbenchCompile,
 } from "./workbenchCompile";
 import type {
-  CompileWorkbenchStylesOptions,
+  WorkbenchCompileOptions,
+  WorkbenchCompileStylesOptions,
   WorkbenchStyleReloadOptions,
   WorkbenchCompileResult,
 } from "./workbenchCompile";
 
-type CliOptions = CompileWorkbenchStylesOptions & {
+type CliOptions = WorkbenchCompileStylesOptions & {
   watch?: boolean;
   styleReload?: boolean | WorkbenchStyleReloadOptions;
+  demoInputDir?: string;
 };
 
 function readFlag(args: string[], names: string[]) {
@@ -111,12 +113,29 @@ function printResult(result: WorkbenchCompileResult) {
   printRegistryResult(result);
 }
 
-async function build(options: CompileWorkbenchStylesOptions) {
-  const result = await compileWorkbenchStyles(options);
-  const files = result.files.map((file) => file.outputFile).join(", ");
+function toCompileOptions(options: CliOptions): WorkbenchCompileOptions {
+  return {
+    styles: {
+      inputDir: options.inputDir,
+      outputDir: options.outputDir,
+      compileForWorkbench: options.compileForWorkbench,
+      assetUrlPrefix: options.assetUrlPrefix,
+      clean: options.clean,
+    },
+    demos: options.demoInputDir
+      ? {
+          inputDir: options.demoInputDir,
+        }
+      : undefined,
+  };
+}
+
+async function build(options: CliOptions) {
+  const result = await workbenchCompile(toCompileOptions(options));
+  const files = result.styles?.files.map((file) => file.outputFile).join(", ");
 
   console.log(
-    `demo-workbench styles: compiled ${result.files.length} file(s)${
+    `demo-workbench styles: compiled ${result.styles?.files.length ?? 0} file(s)${
       files ? `: ${files}` : ""
     }`,
   );
@@ -132,20 +151,14 @@ async function main() {
     return;
   }
 
-  const demos = options.demoInputDir
-    ? { inputDir: options.demoInputDir }
-    : undefined;
+  const compileOptions = toCompileOptions(options);
 
-  const watchPaths = getWorkbenchCompileWatchPaths({
-    styles: options,
-    demos,
-  });
+  const watchPaths = getWorkbenchCompileWatchPaths(compileOptions);
 
   console.log(`demo-workbench styles: watching ${watchPaths.join(", ")}`);
 
   await watchWorkbenchCompile({
-    styles: options,
-    demos,
+    ...compileOptions,
     debounceMs: 50,
     styleReload: options.styleReload,
     onBuild: printResult,

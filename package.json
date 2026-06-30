@@ -13,9 +13,7 @@
   },
   "homepage": "https://github.com/voodoofugu/demo-workbench#readme",
   "type": "module",
-  "sideEffects": [
-    "./dist/styles.css"
-  ],
+  "sideEffects": false,
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -23,9 +21,6 @@
     "*": {
       "node": [
         "./dist/node/index.d.ts"
-      ],
-      "styles.css": [
-        "./dist/styles.css"
       ]
     }
   },
@@ -35,7 +30,6 @@
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     },
-    "./styles.css": "./dist/styles.css",
     "./node": {
       "types": "./dist/node/index.d.ts",
       "import": "./dist/node/index.js",
@@ -49,8 +43,7 @@
   ],
   "scripts": {
     "dev": "vite --host 127.0.0.1 --open",
-    "build": "npm run build:styles && tsup src/index.ts src/node/index.ts src/node/cli.ts --format esm,cjs --dts --clean --shims && cp src/styles/workbench.css dist/styles.css",
-    "build:styles": "tailwindcss -c tailwind.config.cjs -i src/styles/workbench.input.css -o src/styles/workbench.css --minify && node scripts/write-workbench-css-module.mjs",
+    "build": "rollup -c",
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm run build && npm test && npm run pack:dry",
     "pack:dry": "npm pack --dry-run",
@@ -72,16 +65,20 @@
     "react-dom": ">=18 <20"
   },
   "devDependencies": {
+    "@rollup/plugin-commonjs": "^28.0.9",
+    "@rollup/plugin-node-resolve": "^15.3.1",
+    "@rollup/plugin-terser": "^0.4.4",
+    "@rollup/plugin-typescript": "^12.3.0",
     "@types/node": "^25.9.4",
     "@types/react": "^19.0.4",
     "@types/react-dom": "^19.0.2",
     "@vitejs/plugin-react": "^6.0.2",
-    "autoprefixer": "^10.5.0",
-    "postcss": "^8.5.15",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "tailwindcss": "^3.4.19",
-    "tsup": "^8.5.0",
+    "rollup": "^4.62.2",
+    "rollup-plugin-delete": "^2.2.0",
+    "rollup-plugin-dts": "^6.4.1",
+    "tslib": "^2.8.1",
     "typescript": "^5.3.3",
     "vite": "^8.0.16"
   },
@@ -96,6 +93,6 @@
     "storybook-alternative"
   ],
   "bin": {
-    "demo-workbench-styles": "./dist/node/cli.js"
+    "demo-workbench-styles": "dist/node/cli.js"
   }
 }

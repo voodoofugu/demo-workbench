@@ -18,9 +18,9 @@
 
 It is designed for component libraries, visual experiments, scroll demos, style systems and project-specific UI sandboxes: places where you want a reusable demo shell without rebuilding the same grid, search, theme toggle, preview state and storage logic every time.
 
-It is not a full documentation system. It does not generate docs, parse MDX, run tests in the browser or replace Storybook. It only gives a clean workbench shell that a project can feed with its own demo manifest and styles.
+It is not a full documentation system. It does not generate docs, parse MDX, run tests in the browser or replace Storybook. It gives a clean workbench shell plus a small compile step that discovers demo files and prepares the generated registry used by the shell.
 
-The core idea is simple - the package owns the workbench UI, while the project owns the demos.
+The core idea is simple - the package owns the workbench UI and generated registry, while the project owns the demo files and the import function that loads them.
 
 <h2></h2>
 
@@ -69,13 +69,11 @@ For local sibling-project development:
 ```tsx
 import DemoWorkbench from "demo-workbench";
 
-import demos from "./demoManifest";
-
 export default function App() {
   return (
     <DemoWorkbench
       title="My Project Demos"
-      demos={demos}
+      demoLoader={(name) => import(`./pages/${name}`)}
       styleLoader={(name) => import(`../css/${name}.css`)}
     />
   );
@@ -84,7 +82,7 @@ export default function App() {
 
 <b>Description:</b><em><br />
 Renders the full workbench shell: header, search, theme toggle, scrollable demo grid, loading state, opened-demo modal and persisted workbench values.<br />
-The consuming project passes demo entries and optional render hooks, while the package keeps the reusable layout and shell styling in one place.
+The consuming project runs <code>workbenchCompile</code> to generate demo names, then passes <code>demoLoader</code> so the shell can import each generated name on demand.
 </em><br />
 
 <b>Signature:</b><br />
@@ -96,8 +94,7 @@ function DemoWorkbench(props: DemoWorkbenchProps): JSX.Element;
 <b>Props:</b><br />
 
 - `title?: string` - shell title shown in the workbench header and document title.
-- `demos?: DemoItem[]` - searchable demo manifest. If omitted, generated registry names are loaded through `demoLoader`.
-- `demoLoader?: (name: string) => Promise<DemoModule>` - async loader for generated demo names.
+- `demoLoader: (name: string) => Promise<DemoModule>` - async loader for generated demo names.
 - `styleLoader?: (name: string) => Promise<unknown>` - dynamic style loader used by `styled-atom`.
 - `styleReloadUrl?: string | false` - optional dev-only SSE URL used to reload mounted style atoms after watch rebuilds.
 - `styleReloadManifestUrl?: string | false` - optional generated manifest URL that auto-enables style reload while the watch script is running.
@@ -222,7 +219,7 @@ await watchWorkbenchCompile({
 ```
 
 <b>Description:</b><em><br />
-Starts with one full compile. After that, direct changes to one top-level style file recompile only that file. Changes to Sass partials such as <code>\_mixins.scss</code> trigger a full style compile because dependency ownership is ambiguous. Demo changes regenerate only the registry section.
+Starts with one full compile. After that, direct changes to one top-level style file recompile only that file. Changes to Sass partials such as <code>\_mixins.scss</code> trigger a full style compile because dependency ownership is ambiguous. Demo registry changes are limited to file-list changes such as adding, removing or renaming demo files; editing demo component content is left to the host dev server.
 </em><br />
 
 <b>Return:</b><br />
@@ -258,28 +255,6 @@ Returns the style input directory, demo input directory and any extra host paths
 
 <h2></h2>
 
-<details><summary><b><code>compileWorkbenchStyles</code></b>: <em>style-first helper</em></summary><br /><ul><div>
-
-<b>Usage:</b><br />
-
-```ts
-import { compileWorkbenchStyles } from "demo-workbench/node";
-
-const result = await compileWorkbenchStyles({
-  inputDir: "titans_rc/styles/scss",
-  outputDir: "src/styles/css",
-  demoInputDir: "src/components/pages",
-});
-```
-
-<b>Description:</b><em><br />
-Convenience wrapper around <code>workbenchCompile</code> for scripts that primarily compile styles. It returns the style result at the top level and an optional <code>demos</code> registry section.
-</em><br />
-
-</div></ul></details>
-
-<h2></h2>
-
 </div></ul>
 
 <h2></h2>
@@ -290,7 +265,7 @@ Convenience wrapper around <code>workbenchCompile</code> for scripts that primar
 
 ```tsx
 <DemoWorkbench
-  demos={demos}
+  demoLoader={(name) => import(`./pages/${name}`)}
   styleLoader={(name) => import(`../styles/${name}.css`)}
   styleReloadManifestUrl="/workbench-css/demo-workbench-style-reload.json"
   baseCssFiles={["output", "theme"]}
@@ -345,7 +320,7 @@ await watchWorkbenchCompile({
 
 ```tsx
 <DemoWorkbench
-  demos={demos}
+  demoLoader={(name) => import(`./pages/${name}`)}
   styleLoader={(name) => import(`./workbench-css/${name}.css`)}
   styleReloadManifestUrl="/workbench-css/demo-workbench-style-reload.json"
 />
@@ -359,7 +334,7 @@ await watchWorkbenchCompile({
 
 ```tsx
 <DemoWorkbench
-  demos={demos}
+  demoLoader={(name) => import(`./pages/${name}`)}
   renderDemoContent={(pageName) => (
     <div data-demo-page={pageName} className="project-demo-layer" />
   )}

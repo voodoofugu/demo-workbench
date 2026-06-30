@@ -3,11 +3,20 @@ import path from "node:path";
 
 const root = process.cwd();
 const publishDir = path.join(root, "publish");
-const publishDist = path.join(publishDir, "dist");
 
 const rootPackage = JSON.parse(
   await readFile(path.join(root, "package.json"), "utf8"),
 );
+
+const distFiles = [
+  "dist/index.js",
+  "dist/index.cjs",
+  "dist/index.d.ts",
+  "dist/node/index.js",
+  "dist/node/index.cjs",
+  "dist/node/index.d.ts",
+  "dist/node/cli.js",
+];
 
 const isLocalDependencySpec = (spec) =>
   spec.startsWith(".") || spec.startsWith("/") || spec.startsWith("file:");
@@ -67,7 +76,14 @@ const publishPackage = {
 await rm(publishDir, { recursive: true, force: true });
 await mkdir(publishDir, { recursive: true });
 
-await cp(path.join(root, "dist"), publishDist, { recursive: true });
+for (const file of distFiles) {
+  const source = path.join(root, file);
+  const target = path.join(publishDir, file);
+
+  await mkdir(path.dirname(target), { recursive: true });
+  await cp(source, target);
+}
+
 await cp(path.join(root, "README.md"), path.join(publishDir, "README.md"));
 await cp(path.join(root, "LICENSE"), path.join(publishDir, "LICENSE"));
 

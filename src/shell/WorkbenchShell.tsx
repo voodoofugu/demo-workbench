@@ -60,7 +60,8 @@ export default memo(function WorkbenchShell({
     <div
       ref={rootRef}
       id="templateBody"
-      className={`absolute overflow-hidden${theme ? " dark" : ""}`}
+      className="demo-workbench-shell"
+      data-demo-workbench-theme={theme ? "dark" : "light"}
     >
       <WorkbenchLayout title={title} demos={demos}>
         <DemoGrid

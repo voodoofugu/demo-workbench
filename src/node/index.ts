@@ -1,5 +1,4 @@
 export {
-  compileWorkbenchStyles,
   getWorkbenchCompileWatchPaths,
   WORKBENCH_STYLE_RELOAD_MANIFEST_FILE,
   watchWorkbenchCompile,
@@ -7,8 +6,6 @@ export {
 } from "./workbenchCompile";
 
 export type {
-  CompileWorkbenchStylesOptions,
-  CompileWorkbenchStylesResult,
   WorkbenchCompileDemoResult,
   WorkbenchCompileDemoOptions,
   WorkbenchCompileOptions,

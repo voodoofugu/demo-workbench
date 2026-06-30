@@ -5,7 +5,6 @@ import path from "node:path";
 import test from "node:test";
 
 import {
-  compileWorkbenchStyles,
   discoverWorkbenchFileNames,
   WORKBENCH_STYLE_RELOAD_MANIFEST_FILE,
   watchWorkbenchCompile,
@@ -38,7 +37,7 @@ async function restoreFileSnapshot({ filePath, content }) {
   await writeFile(filePath, content);
 }
 
-test("compileWorkbenchStyles scopes demo css, rewrites root selectors, url assets, and minifies output", async () => {
+test("workbenchCompile scopes demo css, rewrites root selectors, url assets, and minifies output", async () => {
   await withTempDir(async (dir) => {
     const inputDir = path.join(dir, "input");
     const outputDir = path.join(dir, "output");
@@ -56,17 +55,18 @@ test("compileWorkbenchStyles scopes demo css, rewrites root selectors, url asset
       `.lead { display: block; }\n`,
     );
 
-    const result = await compileWorkbenchStyles({
-      inputDir,
-      outputDir,
-      assetUrlPrefix: "http://localhost:3000/img/",
+    const result = await workbenchCompile({
+      styles: {
+        inputDir,
+        outputDir,
+        assetUrlPrefix: "http://localhost:3000/img/",
+      },
     });
 
-    assert.deepEqual(result.files.map((file) => file.outputFile).sort(), [
-      "01-all.css",
-      "plain.css",
-      "screen.css",
-    ]);
+    assert.deepEqual(
+      result.styles.files.map((file) => file.outputFile).sort(),
+      ["01-all.css", "plain.css", "screen.css"],
+    );
     assert.deepEqual(
       JSON.parse(
         await readFile(
@@ -125,7 +125,7 @@ test("compileWorkbenchStyles scopes demo css, rewrites root selectors, url asset
   });
 });
 
-test("compileWorkbenchStyles can emit production css without workbench isolation", async () => {
+test("workbenchCompile can emit production css without workbench isolation", async () => {
   await withTempDir(async (dir) => {
     const inputDir = path.join(dir, "input");
     const outputDir = path.join(dir, "output");
@@ -135,10 +135,12 @@ test("compileWorkbenchStyles can emit production css without workbench isolation
       `body { margin: 0; }\n.card { color: blue; }\n`,
     );
 
-    await compileWorkbenchStyles({
-      inputDir,
-      outputDir,
-      compileForWorkbench: false,
+    await workbenchCompile({
+      styles: {
+        inputDir,
+        outputDir,
+        compileForWorkbench: false,
+      },
     });
 
     const css = await readFile(path.join(outputDir, "prod.css"), "utf8");
@@ -193,6 +195,19 @@ test("workbenchCompile returns section-shaped styles and demos results", async (
         ["one.css"],
       );
       assert.deepEqual(result.demos.names, ["AlphaDemo"]);
+      assert.ok(
+        result.demos.outputFiles.some((file) =>
+          file.endsWith("src/state/generatedWorkbenchRegistry.ts"),
+        ),
+      );
+      assert.ok(
+        result.demos.outputFiles.some((file) => file.endsWith("dist/index.js")),
+      );
+      assert.ok(
+        result.demos.outputFiles.some((file) =>
+          file.endsWith("dist/index.cjs"),
+        ),
+      );
       assert.equal("fileRegistry" in result, false);
     });
   } finally {
@@ -231,6 +246,12 @@ function waitForBuild(builds, count) {
       }
     });
   });
+}
+
+async function waitForNoBuild(builds, durationMs = 250) {
+  const count = builds.length;
+  await new Promise((resolve) => setTimeout(resolve, durationMs));
+  assert.equal(builds.length, count);
 }
 
 test("watchWorkbenchCompile recompiles only the changed top-level style file", async () => {
@@ -278,6 +299,68 @@ test("watchWorkbenchCompile recompiles only the changed top-level style file", a
       await watch.close();
     }
   });
+});
+
+test("watchWorkbenchCompile rebuilds demo registry only when demo file names change", async () => {
+  const registryFiles = [
+    path.join(process.cwd(), "src/state/generatedWorkbenchRegistry.ts"),
+    path.join(process.cwd(), "dist/index.js"),
+    path.join(process.cwd(), "dist/index.cjs"),
+  ];
+  const originalRegistryFiles = await Promise.all(
+    registryFiles.map(async (filePath) => ({
+      filePath,
+      content: await readOptionalFile(filePath),
+    })),
+  );
+
+  try {
+    await withTempDir(async (dir) => {
+      const demoInputDir = path.join(dir, "demos");
+      await mkdir(demoInputDir, { recursive: true });
+      await writeFile(
+        path.join(demoInputDir, "AlphaDemo.tsx"),
+        `export default function AlphaDemo() { return null; }\n`,
+      );
+
+      const builds = [];
+      builds.waiters = [];
+      const watch = await watchWorkbenchCompile({
+        demos: { inputDir: demoInputDir },
+        debounceMs: 20,
+        onBuild: (result) => {
+          builds.push(result);
+          for (const waiter of builds.waiters.splice(0)) waiter();
+        },
+      });
+
+      try {
+        await new Promise((resolve) => watch.watcher.once("ready", resolve));
+        assert.deepEqual(builds[0].demos.names, ["AlphaDemo"]);
+
+        await writeFile(
+          path.join(demoInputDir, "AlphaDemo.tsx"),
+          `export default function AlphaDemo() { return "changed"; }\n`,
+        );
+        await waitForNoBuild(builds);
+
+        await writeFile(
+          path.join(demoInputDir, "BetaDemo.tsx"),
+          `export default function BetaDemo() { return null; }\n`,
+        );
+        await waitForBuild(builds, 2);
+        assert.deepEqual(builds[1].demos.names, ["AlphaDemo", "BetaDemo"]);
+
+        await rm(path.join(demoInputDir, "BetaDemo.tsx"), { force: true });
+        await waitForBuild(builds, 3);
+        assert.deepEqual(builds[2].demos.names, ["AlphaDemo"]);
+      } finally {
+        await watch.close();
+      }
+    });
+  } finally {
+    await Promise.all(originalRegistryFiles.map(restoreFileSnapshot));
+  }
 });
 
 test("watchWorkbenchCompile serves fresh css through the style reload endpoint", async () => {

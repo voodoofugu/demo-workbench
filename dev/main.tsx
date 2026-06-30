@@ -2,7 +2,7 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 
 import DemoWorkbench from "../src";
-import { exampleDemoPages } from "../examples";
+import { AlphaExample, BetaExample } from "../examples";
 
 import alphaCss from "../examples/styles/alpha.css?raw";
 import betaCss from "../examples/styles/beta.css?raw";
@@ -24,11 +24,32 @@ function styleLoader(name: string) {
   return Promise.resolve({ default: css });
 }
 
+const demoModules = {
+  "Alpha example": {
+    default: AlphaExample,
+    cssFiles: ["examples/alpha.css"],
+  },
+  "Beta example": {
+    default: BetaExample,
+    cssFiles: ["examples/beta.css"],
+  },
+};
+
+function demoLoader(name: string) {
+  const demo = demoModules[name as keyof typeof demoModules];
+
+  if (!demo) {
+    return Promise.reject(new Error(`Unknown dev demo: ${name}`));
+  }
+
+  return Promise.resolve(demo);
+}
+
 function App() {
   return (
     <DemoWorkbench
       title="demo-workbench dev"
-      demos={exampleDemoPages}
+      demoLoader={demoLoader}
       styleLoader={styleLoader}
       baseCssFiles={["output"]}
       viewport={{ width: 960, height: 540 }}

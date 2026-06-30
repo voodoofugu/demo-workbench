@@ -15,12 +15,10 @@ export default memo(function WorkbenchLayout({
   children?: ReactNode;
 }) {
   return (
-    <main className="fixed h-full w-full bg-indigo-200 dark:bg-indigo-950">
-      <div className="relative mx-auto my-30 w-calcFull-80 max-w-1160 rounded-18 bg-indigo-250 p-10 shadow-shadowColor6 animate-appear dark:bg-indigo-1000 dark:shadow-darkColor1">
+    <main className="demo-workbench-layout">
+      <div className="demo-workbench-header">
         <SearchControl demos={demos} />
-        <div className="text-center text-2xl font-bold italic text-indigo-400 text-shadow-tS1 dark:text-indigo-500 dark:text-shadow-tS1Black">
-          {title}
-        </div>
+        <div className="demo-workbench-title">{title}</div>
         <ToggleButton />
       </div>
       {children}

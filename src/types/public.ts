@@ -52,7 +52,7 @@ export type DemoItem = {
  * lazy loader used for names from the generated workbench registry.
  * @param name generated demo basename.
  * @description
- * Use this when the app lets `demo-workbench` discover names through its generated registry instead of passing a complete `demos` array.
+ * `workbenchCompile` discovers demo file basenames and stores them in the generated registry. `DemoWorkbench` calls this loader for each generated name when it needs the React module.
  * @example
  * ```ts
  * const demoLoader: DemoWorkbenchDemoLoader = (name) =>
@@ -146,12 +146,12 @@ export type DemoWorkbenchStorageEntry = [string, DemoWorkbenchStorageKind?];
  * ### ***DemoWorkbenchProps***:
  * props for the reusable React workbench shell.
  * @description
- * Minimal setup is a title and either a lazy demo manifest or a generated registry loader. The host project keeps ownership of demo components, CSS imports, project overlays and optional opened-demo content.
+ * Minimal setup is a title, a generated-registry `demoLoader` and optional style loading. The host project keeps ownership of demo components, CSS imports, project overlays and optional opened-demo content.
  * @example
  * ```tsx
  * <DemoWorkbench
  *   title="Project demos"
- *   demos={demos}
+ *   demoLoader={(name) => import(`./pages/${name}`)}
  *   styleLoader={(name) => import(`./workbench-css/${name}.css`)}
  * />
  * ```
@@ -159,10 +159,8 @@ export type DemoWorkbenchStorageEntry = [string, DemoWorkbenchStorageKind?];
 export type DemoWorkbenchProps = {
   /** Shell title shown in the workbench header and document title. */
   title?: string;
-  /** Demo manifest rendered as searchable cards. If omitted, generated registry + `demoLoader` are used. */
-  demos?: DemoItem[];
   /** Loader for generated demo names stored in the internal workbench registry. */
-  demoLoader?: DemoWorkbenchDemoLoader;
+  demoLoader: DemoWorkbenchDemoLoader;
   /** Dynamic style loader used by `styled-atom`, e.g. `(name) => import(...)`. */
   styleLoader?: (name: string) => Promise<unknown>;
   /** Optional dev-only Server-Sent Events URL used to fetch and replace mounted CSS after watch rebuilds. */
@@ -179,7 +177,7 @@ export type DemoWorkbenchProps = {
   initialState?: DemoWorkbenchInitialState;
   /** Optional host content rendered as children of an opened demo component. */
   renderDemoContent?: (pageName: string) => ReactNode;
-  /** Optional inline background value for the opened demo body. Defaults to Tailwind `bg-white`. */
+  /** Optional inline background value for the opened demo body. Defaults to `#fff`. */
   bodyBg?: string;
   /** Component rendered when search/hash points to a missing demo. */
   notFoundComponent?: ComponentType;

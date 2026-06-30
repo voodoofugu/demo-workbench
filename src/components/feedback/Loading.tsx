@@ -1,7 +1,7 @@
-import { StyledAtom, type StyledAtomStylesT } from "styled-atom";
+import { StyledAtom, type StyledAtomStyles } from "styled-atom";
 import type { CSSProperties } from "react";
 
-const loadingStyles: StyledAtomStylesT = {
+const loadingStyles: StyledAtomStyles = {
   "@keyframes rotate-one": {
     "0%": {
       transform: "rotateX(60deg) rotate(0deg)",

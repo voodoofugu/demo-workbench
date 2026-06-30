@@ -34,7 +34,7 @@ type DemoCellProps = {
 };
 
 const loadFill = (
-  <div className="relative h-full min-h-[120px] w-full overflow-hidden rounded-2xl bg-indigo-100/70 dark:bg-slate-900/70">
+  <div className="demo-workbench-load-fill">
     <Loading noBG />
   </div>
 );
@@ -91,7 +91,8 @@ function DemoBody({
     <div id="resize" style={scaledStyle}>
       <div
         id={pageName}
-        className={`${mode === "page" ? "relative min-h-full" : "relative h-full"}`}
+        className="demo-workbench-demo-body"
+        data-mode={mode}
       >
         <Component pageName={pageName}>
           {shouldRenderContent ? (
@@ -222,7 +223,7 @@ const DemoCell = memo(function DemoCell({
 
   if (mode === "page") {
     return (
-      <div className="relative min-h-full overflow-hidden dark:bg-slate-950">
+      <div className="demo-workbench-page-cell">
         {content}
         <PageCloseBtn onClick={handleClose} />
       </div>
@@ -239,22 +240,19 @@ const DemoCell = memo(function DemoCell({
   return (
     <div
       data-cell={pageName}
-      className={`animate-ident relative flex h-156 w-238 items-center justify-center overflow-hidden rounded-18 bg-indigo-100 text-indigo-500 shadow-shadow4 transition-all1 hover:bg-indigo-50 hover:shadow-shadow8 active:scale-95 dark:bg-indigo-900 dark:text-indigo-400 dark:shadow-shadow5 dark:hover:bg-indigo-800 dark:hover:shadow-shadow6 ${
-        isOpen
-          ? "ring-2 ring-indigo-500 ring-offset-2 ring-offset-indigo-100 dark:ring-offset-slate-950"
-          : ""
-      }`}
+      className="demo-workbench-card"
+      data-open={isOpen ? "true" : "false"}
     >
-      <div className="pointer-events-none absolute h-640 w-1200 translate-y-10 scale-[0.180134] overflow-hidden rounded-50 bg-white shadow-shadow3 dark:shadow-shadow7">
+      <div className="demo-workbench-preview-frame">
         {shouldRenderFallback ? (
-          <div className="h-full w-full bg-indigo-100/70 dark:bg-slate-900/70" />
+          <div className="demo-workbench-card-fallback" />
         ) : (
           content
         )}
       </div>
       <Tooltip text={pageName} position="top">
         <a
-          className="absolute top-0 left-1/2 -translate-x-1/2 h-full w-full px-[20px] cursor-pointer overflow-hidden text-ellipsis whitespace-nowrap text-center text-xs font-bold leading-7 dark:text-shadow-tS1Black"
+          className="demo-workbench-card-link"
           href={cardHref}
           aria-disabled={!DynamicComponent}
           onClick={handleOpen}

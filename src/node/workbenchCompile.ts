@@ -225,30 +225,6 @@ export type WorkbenchCompileWatchResult = {
   close: () => Promise<void>;
 };
 
-/**---
- * ## ![logo](https://github.com/voodoofugu/demo-workbench/raw/main/src/assets/demo-workbench-logo.png)
- * ### ***CompileWorkbenchStylesOptions***:
- * back-compatible helper options for style-first host scripts.
- * @description
- * Accepts the same style options as `workbenchCompile({ styles })` and can optionally include a demo input directory for registry generation.
- */
-export type CompileWorkbenchStylesOptions = WorkbenchCompileStylesOptions & {
-  /** Optional demo page directory to include in the generated registry. */
-  demoInputDir?: string;
-};
-
-/**---
- * ## ![logo](https://github.com/voodoofugu/demo-workbench/raw/main/src/assets/demo-workbench-logo.png)
- * ### ***CompileWorkbenchStylesResult***:
- * style compile result plus an optional generated demo registry section.
- * @description
- * Returned by the legacy `compileWorkbenchStyles` helper.
- */
-export type CompileWorkbenchStylesResult = WorkbenchCompileStylesResult & {
-  /** Demo registry result, when `demoInputDir` was provided. */
-  demos?: WorkbenchCompileDemoResult;
-};
-
 type StyleCompileEvent = {
   event: "add" | "change" | "unlink";
   inputPath: string;
@@ -668,7 +644,7 @@ async function writeGeneratedRegistryBundle(registry: { demos: string[] }) {
     )
   ).filter((filePath): filePath is string => Boolean(filePath));
   const registryPattern =
-    /var generatedWorkbenchRegistry = \{\n  demos: [\s\S]*?(?:,\n  popups: [\s\S]*?)?\n\};/;
+    /(?:var|let|const)\s+generatedWorkbenchRegistry\s*=\s*\{\s*demos\s*:\s*\[[\s\S]*?\]\s*(?:,\s*popups\s*:\s*\[[\s\S]*?\]\s*)?\};/;
   const renderedRegistry = renderBundledRegistry(registry);
   const writtenFiles: string[] = [];
 
@@ -908,6 +884,10 @@ function isPathInDirectory(filePath: string, directory: string) {
   );
 }
 
+function hasCompileResult(result: WorkbenchCompileResult) {
+  return Boolean(result.styles || result.demos);
+}
+
 const DEFAULT_STYLE_RELOAD_PORT = 38297;
 const DEFAULT_STYLE_RELOAD_HOST = "127.0.0.1";
 const DEFAULT_STYLE_RELOAD_PATH = "/demo-workbench-style-events";
@@ -1103,12 +1083,13 @@ async function compileWatchEvents(
           !isStyleFile(event.inputPath),
       )
     : false;
-  const demoChanged = options.demos
+  const demoFileListChanged = options.demos
     ? events.some(
         (event) =>
-          path.resolve(event.inputPath) ===
+          event.event !== "change" &&
+          (path.resolve(event.inputPath) ===
             path.resolve(options.demos!.inputDir) ||
-          isPathInDirectory(event.inputPath, options.demos!.inputDir),
+            isPathInDirectory(event.inputPath, options.demos!.inputDir)),
       )
     : false;
 
@@ -1119,9 +1100,11 @@ async function compileWatchEvents(
         ? await compileStyles(options.styles, styleEvents)
         : undefined
     : undefined;
-  const registry = demoChanged ? await compileGeneratedRegistry(options) : {};
+  const registry = demoFileListChanged
+    ? await compileGeneratedRegistry(options)
+    : {};
 
-  if (!styles && !registry.demos) return workbenchCompile(options);
+  if (!styles && !registry.demos) return {};
   return { styles, ...registry };
 }
 
@@ -1169,6 +1152,10 @@ export async function watchWorkbenchCompile(
     const result = events?.length
       ? await compileWatchEvents(compileOptions, events, extraWatchPaths)
       : await workbenchCompile(compileOptions);
+
+    if (events?.length && !hasCompileResult(result)) {
+      return result;
+    }
 
     if (result.styles) {
       await styleReloadServer?.update(result.styles.files);
@@ -1247,50 +1234,5 @@ export async function watchWorkbenchCompile(
       await watcher.close();
       await styleReloadServer?.close();
     },
-  };
-}
-
-/**---
- * ## ![logo](https://github.com/voodoofugu/demo-workbench/raw/main/src/assets/demo-workbench-logo.png)
- * ### ***compileWorkbenchStyles***:
- * style-first helper around `workbenchCompile`.
- * @description
- * Convenience wrapper for older host scripts that primarily compile styles. It returns the style result at the top level and includes an optional `demos` registry section when `demoInputDir` is provided.
- * @example
- * ```ts
- * const result = await compileWorkbenchStyles({
- *   inputDir: "titans_rc/styles/scss",
- *   outputDir: "src/styles/workbench-css",
- *   demoInputDir: "src/components/pages",
- * });
- * ```
- */
-export async function compileWorkbenchStyles(
-  options: CompileWorkbenchStylesOptions,
-): Promise<CompileWorkbenchStylesResult> {
-  const result = await workbenchCompile({
-    styles: {
-      inputDir: options.inputDir,
-      outputDir: options.outputDir,
-      compileForWorkbench: options.compileForWorkbench,
-      assetUrlPrefix: options.assetUrlPrefix,
-      clean: options.clean,
-    },
-    demos: options.demoInputDir
-      ? {
-          inputDir: options.demoInputDir,
-        }
-      : undefined,
-  });
-
-  if (!result.styles) {
-    throw new Error(
-      "compileWorkbenchStyles requires style input/output options",
-    );
-  }
-
-  return {
-    ...result.styles,
-    demos: result.demos,
   };
 }

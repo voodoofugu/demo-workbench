@@ -37,12 +37,10 @@ test("DemoCell card markup matches workbench cell shell", async () => {
   assert.doesNotMatch(demoCell, /<article\b/);
   assert.doesNotMatch(demoCell, /<button\b[\s\S]*data-cell/);
   assert.match(demoCell, /<div\s+data-cell=\{pageName\}/);
-  assert.match(
-    demoCell,
-    /className=\{`animate-ident relative flex h-156 w-238/,
-  );
+  assert.match(demoCell, /className="demo-workbench-card"/);
+  assert.match(demoCell, /data-open=\{isOpen \? "true" : "false"\}/);
   assert.match(demoCell, /<a\s+[\s\S]*href=\{cardHref\}/);
-  assert.match(demoCell, /scale-\[0\.180134\]/);
+  assert.match(demoCell, /className="demo-workbench-preview-frame"/);
 });
 
 test("workbench scope is internal and applied to every demo preview wrapper", async () => {
@@ -88,8 +86,8 @@ test("buttons use safe click semantics and nexus functional updates", async () =
   assert.doesNotMatch(pageCloseBtn, /<a\b/);
   assert.doesNotMatch(pageCloseBtn, /href="#"/);
   assert.match(pageCloseBtn, /type="button"/);
-  assert.match(pageCloseBtn, /z-40/);
-  assert.match(toTopButton, /z-20/);
+  assert.match(pageCloseBtn, /className="demo-workbench-page-close"/);
+  assert.match(toTopButton, /className="demo-workbench-to-top"/);
 
   assert.match(
     stateTypes,
@@ -161,18 +159,27 @@ test("DemoWorkbench restores state before rendering children without setting nex
   assert.match(storageState, /restoredState/);
 });
 
-test("DemoWorkbench keeps one stable baseCssFiles list without inline style props", async () => {
-  const [publicTypes, demoWorkbench, demoCell, styledAtomBridge, workbenchCss] =
-    await Promise.all([
-      readFile(path.join(root, "src/types/public.ts"), "utf8"),
-      readFile(path.join(root, "src/shell/DemoWorkbench.tsx"), "utf8"),
-      readFile(path.join(root, "src/components/DemoCell.tsx"), "utf8"),
-      readFile(path.join(root, "src/styles/styledAtom.ts"), "utf8"),
-      readFile(path.join(root, "src/styles/workbench.input.css"), "utf8"),
-    ]);
+test("DemoWorkbench keeps one stable baseCssFiles list and owns shell styles inline", async () => {
+  const [
+    publicTypes,
+    demoWorkbench,
+    demoCell,
+    styledAtomBridge,
+    workbenchStyles,
+  ] = await Promise.all([
+    readFile(path.join(root, "src/types/public.ts"), "utf8"),
+    readFile(path.join(root, "src/shell/DemoWorkbench.tsx"), "utf8"),
+    readFile(path.join(root, "src/components/DemoCell.tsx"), "utf8"),
+    readFile(path.join(root, "src/styles/styledAtom.ts"), "utf8"),
+    readFile(path.join(root, "src/styles/workbenchStyles.ts"), "utf8"),
+  ]);
 
   assert.match(publicTypes, /baseCssFiles\?:\s*string\[\]/);
   assert.match(publicTypes, /cssFiles\?:\s*string\[\]/);
+  assert.match(publicTypes, /demoLoader:\s*DemoWorkbenchDemoLoader/);
+  assert.doesNotMatch(publicTypes, /demos\?:\s*DemoItem\[\]/);
+  assert.doesNotMatch(demoWorkbench, /\bdemos,/);
+  assert.doesNotMatch(demoWorkbench, /resolvedDemos/);
   assert.doesNotMatch(publicTypes, /css\?:\s*string/);
   assert.doesNotMatch(publicTypes, /baseCss\?:\s*string/);
   assert.doesNotMatch(publicTypes, /baseCssLayer\?:\s*string/);
@@ -186,25 +193,39 @@ test("DemoWorkbench keeps one stable baseCssFiles list without inline style prop
     demoWorkbench,
     /hostCssFiles = useStableStringList\(rawHostCssFiles\)/,
   );
-  assert.match(
-    demoWorkbench,
-    /workbenchStyleAtoms\.configure\(loadStyle\)/,
-  );
+  assert.match(demoWorkbench, /workbenchStyleAtoms\.configure\(loadStyle\)/);
   assert.doesNotMatch(demoWorkbench, /layer="workbench"/);
   assert.doesNotMatch(demoWorkbench, /layer=\{baseCssLayer\}/);
   assert.doesNotMatch(demoWorkbench, /css=\{baseCss\}/);
   assert.doesNotMatch(demoCell, /css=\{/);
   assert.doesNotMatch(demoWorkbench, /baseCssLayer =/);
-  assert.doesNotMatch(demoWorkbench, /\.\.\.nextInitialState,[\s\S]*baseCssLayer,/);
+  assert.doesNotMatch(
+    demoWorkbench,
+    /\.\.\.nextInitialState,[\s\S]*baseCssLayer,/,
+  );
   assert.doesNotMatch(demoWorkbench, /vars=\{baseCssVars\}/);
   assert.doesNotMatch(demoWorkbench, /orderedCssFiles/);
-  assert.match(workbenchCss, /\.likeBody/);
+  assert.match(demoWorkbench, /StyledAtom as InlineStyledAtom/);
+  assert.match(
+    demoWorkbench,
+    /name="demo-workbench" encap styles=\{workbenchStyles\}/,
+  );
+  assert.doesNotMatch(demoWorkbench, /workbenchCss/);
+  assert.doesNotMatch(demoWorkbench, /WORKBENCH_STYLE_ATOM/);
+  assert.match(workbenchStyles, /demo-workbench-shell/);
+  assert.match(workbenchStyles, /data-demo-workbench-theme="dark"/);
   assert.match(publicTypes, /styleReloadUrl\?:\s*string \| false/);
   assert.match(publicTypes, /styleReloadManifestUrl\?:\s*string \| false/);
   assert.match(demoWorkbench, /loadStyleReloadUrlFromManifest/);
   assert.match(demoWorkbench, /STYLE_RELOAD_MANIFEST_POLL_MS/);
-  assert.match(demoWorkbench, /new window\.EventSource\(resolvedStyleReloadUrl\)/);
-  assert.match(demoWorkbench, /loadStyleReplacements\(resolvedStyleReloadUrl, fileNames\)/);
+  assert.match(
+    demoWorkbench,
+    /new window\.EventSource\(resolvedStyleReloadUrl\)/,
+  );
+  assert.match(
+    demoWorkbench,
+    /loadStyleReplacements\(resolvedStyleReloadUrl, fileNames\)/,
+  );
   assert.match(demoWorkbench, /workbenchStyleAtoms\.replace\(styles\)/);
   assert.doesNotMatch(styledAtomBridge, /\bStyledAtomStore\b/);
   assert.doesNotMatch(styledAtomBridge, /StyledAtomStoreOptionsT/);
@@ -214,7 +235,10 @@ test("DemoWorkbench keeps one stable baseCssFiles list without inline style prop
   assert.match(demoCell, /className:\s*scopeClassName \|\| undefined/);
   assert.match(demoCell, /toWorkbenchStyleClassName/);
   assert.match(styledAtomBridge, /createStyledAtomStore/);
-  assert.match(styledAtomBridge, /export const workbenchStyleAtoms = createdStyleAtoms/);
+  assert.match(
+    styledAtomBridge,
+    /export const workbenchStyleAtoms = createdStyleAtoms/,
+  );
   assert.doesNotMatch(
     styledAtomBridge,
     /import nexus from "\.\.\/state\/nexus"/,
@@ -256,7 +280,10 @@ test("DemoGrid tracks rendered demos during virtual scrolling and DemoCell resto
   assert.match(demoCell, /mode === "page" \|\| isDemoLoaded \|\| !isScrolling/);
   assert.match(demoCell, /enabled: shouldLoadDynamicModule/);
   assert.match(demoCell, /onLoad\?\.\(pageName\)/);
-  assert.match(demoCell, /hasLoadedObject\s*=\s*isDemoLoaded \|\| Boolean\(DynamicComponent\)/);
+  assert.match(
+    demoCell,
+    /hasLoadedObject\s*=\s*isDemoLoaded \|\| Boolean\(DynamicComponent\)/,
+  );
   assert.doesNotMatch(demoCell, /document\.getElementById\(pageName\)/);
   assert.match(demoCell, /shouldRenderFallback\s*=\s*Boolean/);
   assert.match(demoCell, /isScrolling && !hasLoadedObject/);

@@ -297,11 +297,8 @@ const DemoGrid = memo(function DemoGrid({
     activeDemo && typeof document !== "undefined"
       ? createPortal(
           <div
-            className={`fixed overflow-hidden transition-all1 ${
-              pageExpanded
-                ? "h-full w-full scale-100"
-                : "h-640 w-1200 scale-[0.180134] rounded-50 bg-white shadow-shadow3 dark:shadow-shadow7"
-            } ${pageClassName ?? ""}`}
+            className={`demo-workbench-page-overlay ${pageClassName ?? ""}`}
+            data-expanded={pageExpanded ? "true" : "false"}
             style={{
               top: `${pagePosition.top}px`,
               left: `${pagePosition.left}px`,
@@ -327,16 +324,16 @@ const DemoGrid = memo(function DemoGrid({
       : null;
 
   return (
-    <div className="h-calcScreenH-112 m-auto w-full">
+    <div className="demo-workbench-grid-shell">
       <MorphScroll
-        className="templateScroll relative h-full w-full overflow-hidden"
+        className="demo-workbench-scroll"
         size="auto"
         objectsSize={[238, 156]}
         gap={60}
         progressTrigger={{
           wheel: true,
           progressElement: (
-            <div className="animate-ident relative flex h-full w-[12px] items-center justify-center overflow-hidden rounded-18 bg-indigo-100 text-indigo-500 shadow-shadow4 transition-all1 hover:bg-indigo-50 hover:shadow-shadow8 active:scale-95 dark:bg-indigo-900 dark:text-indigo-400 dark:shadow-shadow5 dark:hover:bg-indigo-800 dark:hover:shadow-shadow6 " />
+            <div className="demo-workbench-scroll-progress" />
           ),
         }}
         edgeGradient={{ color: darkTheme ? "#1e1b4b" : "#c7d2fe" }}
@@ -356,20 +353,16 @@ const DemoGrid = memo(function DemoGrid({
 
       {usedDemos.length === 0 ? (
         NotFoundComponent ? (
-          <div className="animate-ident absolute left-calc50%-119 top-calc50%-77 flex h-156 w-238 rotate-6 items-center justify-center overflow-hidden rounded-18 bg-indigo-100 text-indigo-500 shadow-shadow4 transition-none hover:bg-indigo-50 hover:shadow-shadow8 active:scale-95 dark:bg-indigo-900 dark:text-indigo-400 dark:shadow-shadow5 dark:hover:bg-indigo-800 dark:hover:shadow-shadow6">
-            <div className="pointer-events-none absolute h-640 w-1200 translate-y-10 scale-[0.180134] overflow-hidden rounded-50 bg-white shadow-shadow3 dark:shadow-shadow7">
+          <div className="demo-workbench-not-found-card">
+            <div className="demo-workbench-preview-frame">
               <NotFoundComponent />
             </div>
-            <div className="absolute left-0 top-0 h-full w-full overflow-hidden text-ellipsis whitespace-nowrap px-25 text-center text-xs font-bold leading-7 dark:text-shadow-darkTS1">
-              not found
-            </div>
+            <div className="demo-workbench-not-found-label">not found</div>
           </div>
         ) : (
-          <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-3 rounded-2xl bg-white/90 px-8 py-7 text-center text-zinc-500 shadow-shadow4 backdrop-blur dark:bg-slate-950/80 dark:text-zinc-300">
-            <span className="text-sm font-semibold uppercase tracking-[0.18em] text-indigo-500">
-              No demos
-            </span>
-            <span className="text-lg font-medium text-zinc-800 dark:text-zinc-100">
+          <div className="demo-workbench-empty">
+            <span className="demo-workbench-empty-title">No demos</span>
+            <span className="demo-workbench-empty-body">
               Nothing matches the current filters
             </span>
           </div>

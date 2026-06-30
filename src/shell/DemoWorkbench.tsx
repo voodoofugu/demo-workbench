@@ -1,13 +1,14 @@
 import type { ComponentType } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { StyledAtom as InlineStyledAtom } from "styled-atom";
 import type {
   ImportStyleResult,
   ImportStyle,
   StyleAtomCssReplacement,
 } from "styled-atom";
 
-import workbenchCss from "../styles/workbenchCss";
 import { StyledAtom, workbenchStyleAtoms } from "../styles/styledAtom";
+import workbenchStyles from "../styles/workbenchStyles";
 import RawWorkbenchStorage from "../state/WorkbenchStorage";
 import generatedWorkbenchRegistry from "../state/generatedWorkbenchRegistry";
 import { WorkbenchStateProvider } from "../state/WorkbenchState";
@@ -18,13 +19,12 @@ import RawWorkbenchShell from "./WorkbenchShell";
 import WorkbenchTitle from "./WorkbenchTitle";
 
 import type {
+  DemoItem,
   DemoWorkbenchInitialState,
   DemoWorkbenchProps,
   DemoWorkbenchStorageEntry,
   DemoWorkbenchViewport,
 } from "../types/public";
-
-const WORKBENCH_STYLE_ATOM = "workbench";
 
 const TypedWorkbenchStorage = RawWorkbenchStorage as ComponentType<{
   storageData: DemoWorkbenchStorageEntry[];
@@ -32,7 +32,7 @@ const TypedWorkbenchStorage = RawWorkbenchStorage as ComponentType<{
 
 const TypedWorkbenchShell = RawWorkbenchShell as ComponentType<{
   title: string;
-  demos: DemoWorkbenchProps["demos"];
+  demos: DemoItem[];
   viewport: DemoWorkbenchViewport;
   renderDemoContent: DemoWorkbenchProps["renderDemoContent"];
   bodyBg: DemoWorkbenchProps["bodyBg"];
@@ -117,12 +117,7 @@ async function loadStyleReloadUrlFromManifest(manifestUrl: string) {
 }
 
 function WorkbenchGlobalStyles({ hostFileNames }: { hostFileNames: string[] }) {
-  return (
-    <>
-      <StyledAtom files={WORKBENCH_STYLE_ATOM} />
-      {hostFileNames.length ? <StyledAtom files={hostFileNames} /> : null}
-    </>
-  );
+  return hostFileNames.length ? <StyledAtom files={hostFileNames} /> : null;
 }
 
 /**---
@@ -130,19 +125,18 @@ function WorkbenchGlobalStyles({ hostFileNames }: { hostFileNames: string[] }) {
  * ### ***DemoWorkbench***:
  * searchable React shell for local component and screen demos.
  * @description
- * Renders the full reusable workbench UI: header, search, theme toggle, scrollable demo grid, loading state, opened-demo modal and persisted shell state. The host project supplies demos, style loading and optional render hooks while `demo-workbench` owns the repeated shell behavior.
+ * Renders the full reusable workbench UI: header, search, theme toggle, scrollable demo grid, loading state, opened-demo modal and persisted shell state. `workbenchCompile` supplies the generated demo registry; the host project supplies a `demoLoader`, style loading and optional render hooks while `demo-workbench` owns the repeated shell behavior.
  * @example
  * ```tsx
  * <DemoWorkbench
  *   title="Project demos"
- *   demos={demos}
+ *   demoLoader={(name) => import(`./pages/${name}`)}
  *   styleLoader={(name) => import(`./workbench-css/${name}.css`)}
  * />
  * ```
  */
 export default function DemoWorkbench({
   title = "Demo Workbench",
-  demos,
   demoLoader,
   styleLoader,
   styleReloadUrl,
@@ -221,10 +215,6 @@ export default function DemoWorkbench({
   }, [styleReloadManifestUrl, styleReloadUrl]);
 
   const loadStyle = useCallback<ImportStyle>(async (fileName: string) => {
-    if (fileName === WORKBENCH_STYLE_ATOM) {
-      return Promise.resolve({ default: workbenchCss });
-    }
-
     const reloadUrl = styleReloadUrlRef.current;
     if (reloadUrl) {
       try {
@@ -284,15 +274,12 @@ export default function DemoWorkbench({
 
   const registryDemos = useMemo(
     () =>
-      demoLoader
-        ? generatedWorkbenchRegistry.demos.map((name) => ({
-            name,
-            load: () => demoLoader(name),
-          }))
-        : [],
+      generatedWorkbenchRegistry.demos.map((name) => ({
+        name,
+        load: () => demoLoader(name),
+      })),
     [demoLoader],
   );
-  const resolvedDemos = demos ?? registryDemos;
   const restoredInitialState = useMemo<DemoWorkbenchInitialState>(() => {
     const hashState = getHashWorkbenchState();
     const storedState = (
@@ -326,18 +313,20 @@ export default function DemoWorkbench({
   }, [hostCssFiles, initialState, storageData]);
 
   return (
-    <WorkbenchStateProvider initialState={restoredInitialState}>
-      <WorkbenchGlobalStyles hostFileNames={hostCssFiles} />
-      <WorkbenchTitle title={title} />
-      <TypedWorkbenchStorage storageData={storageData} />
-      <TypedWorkbenchShell
-        title={title}
-        demos={resolvedDemos}
-        viewport={viewport}
-        renderDemoContent={renderDemoContent}
-        bodyBg={bodyBg}
-        notFoundComponent={notFoundComponent}
-      />
-    </WorkbenchStateProvider>
+    <InlineStyledAtom name="demo-workbench" encap styles={workbenchStyles}>
+      <WorkbenchStateProvider initialState={restoredInitialState}>
+        <WorkbenchGlobalStyles hostFileNames={hostCssFiles} />
+        <WorkbenchTitle title={title} />
+        <TypedWorkbenchStorage storageData={storageData} />
+        <TypedWorkbenchShell
+          title={title}
+          demos={registryDemos}
+          viewport={viewport}
+          renderDemoContent={renderDemoContent}
+          bodyBg={bodyBg}
+          notFoundComponent={notFoundComponent}
+        />
+      </WorkbenchStateProvider>
+    </InlineStyledAtom>
   );
 }
