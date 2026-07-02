@@ -54,11 +54,12 @@
   },
   "dependencies": {
     "chokidar": "^5.0.0",
+    "keytask-core": "^1.0.0",
     "lightningcss": "^1.32.0",
-    "morphing-scroll": "2.10.3",
+    "morphing-scroll": "^2.10.5",
     "nexus-state": "^3.1.0",
     "sass-embedded": "^1.100.0",
-    "styled-atom": "^3.0.1"
+    "styled-atom": "^3.0.3"
   },
   "peerDependencies": {
     "react": ">=18 <20",
