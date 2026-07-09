@@ -35,16 +35,6 @@ import DemoWorkbench from "demo-workbench";
 
 Workbench shell styles are injected by the package automatically when `DemoWorkbench` is imported.
 
-For local sibling-project development:
-
-```json
-{
-  "dependencies": {
-    "demo-workbench": "file:../demo-workbench"
-  }
-}
-```
-
 > **✦ Note:**
 >
 > - Supports both **ESM** (`import`) and **CommonJS** (`require`) builds.
@@ -52,12 +42,21 @@ For local sibling-project development:
 > - The package injects reusable shell styles automatically from its main JS bundle.
 > - Project/demo CSS is still loaded by the consuming project through `styleLoader`.
 > - React and React DOM are peer dependencies, so the host app keeps one React instance.
+> - Ships a flat light/dark UI with `grey`, `blue` and `brown` color presets. Users
+>   switch the mode from the header toggle and the color from the title dropdown; both
+>   choices persist in `localStorage`. No configuration is required.
+
+> **✦ Package manager support:**
+>
+> `runWorkbenchCompile` writes the generated demo registry into the installed `demo-workbench` files inside `node_modules`. This works with **npm** (including `file:`/linked installs). It is not supported with **pnpm**, whose content-addressed store must not be mutated. Re-run the compile after `npm install`/package updates to restore the registry.
 
 <h2></h2>
 
 ### API
 
 <ul><div>
+
+###### **— REACT —**
 
 <details><summary><b><code>DemoWorkbench</code></b>: <em>render the reusable demo shell</em></summary><br /><ul><div>
 
@@ -72,8 +71,7 @@ export default function App() {
       title="My Project Demos"
       demoLoader={(name) => import(`./pages/${name}`)}
       styleLoader={(name) => import(`../css/${name}.css`)}
-      styleReloadManifestUrl="/workbench-css/demo-workbench-style-reload.json"
-      baseCssFiles={["output", "theme"]}
+      baseStyles={["output", "theme"]}
     />
   );
 }
@@ -81,7 +79,7 @@ export default function App() {
 
 <b>Description:</b><em><br />
 Renders the full workbench shell: header, search, theme toggle, scrollable demo grid, loading state, opened-demo modal and persisted workbench values.<br />
-The consuming project runs <code>runWorkbenchCompile</code> to generate demo names, then passes <code>demoLoader</code> so the shell can import each generated name on demand.
+The consuming project runs <code>runWorkbenchCompile</code> to generate demo names, then passes <code>demoLoader</code> so the shell can import each generated name on demand. In local development, serve the compiled style output directory as <code>/workbench-css/</code>; the workbench uses that path to load generated CSS and enable style reload while watch mode is running.
 </em><br />
 
 <b>Signature:</b><br />
@@ -95,15 +93,18 @@ function DemoWorkbench(props: DemoWorkbenchProps): JSX.Element;
 - `title?: string` - shell title shown in the workbench header and document title.
 - `demoLoader: (name: string) => Promise<DemoModule>` - async loader for generated demo names.
 - `styleLoader?: (name: string) => Promise<unknown>` - dynamic style loader used by `styled-atom`.
-- `styleReloadUrl?: string | false` - optional dev-only SSE URL used to reload mounted style atoms after watch rebuilds.
-- `styleReloadManifestUrl?: string | false` - optional generated manifest URL that auto-enables style reload while the watch script is running.
-- `baseCssFiles?: string[]` - host-level CSS atoms loaded by the shell.
-- `storageData?: DemoWorkbenchStorageEntry[]` - fields that should persist between reloads.
-- `viewport?: { width: number; height: number }` - base preview viewport used for modal scaling.
-- `initialState?: DemoWorkbenchInitialState` - state applied before storage restoration.
-- `renderDemoContent?: (pageName: string) => ReactNode` - optional host content rendered inside opened demos.
-- `bodyBg?: string` - inline background value for the opened demo body.
-- `notFoundComponent?: ComponentType` - fallback component for unknown demo pages.
+- `baseStyles?: string[]` - host-level CSS atoms loaded by the shell.
+- `baseCssFiles?: string[]` - deprecated alias for `baseStyles`.
+- `autoScale?: false | { width?: number | null; height?: number | null }` - optional opened-demo auto scale reference. Omit it to keep workbench auto scaling disabled.
+- `renderDemoContent?: (pageName: string) => ReactNode` - project layer rendered inside opened demos.
+- `bodyBg?: string` - background value for the opened demo body.
+- `notFoundComponent?: ComponentType` - fallback component for unknown demo pages during search.
+
+<br />
+
+Use `autoScale` only when demos are designed for a known canvas or game/screen size. It does not force the browser window or preview card viewport to that size; it tells the workbench what opened-demo workspace size should be treated as `1x` before calculating scale. Omit `autoScale` to test the demo's own responsive behavior without workbench scaling. Pass `height: null` to scale only by width, or `width: null` to scale only by height.
+
+<br />
 
 <b>Return:</b><br />
 Returns a React element containing the complete reusable workbench shell.
@@ -114,6 +115,8 @@ Project-level SVG filters/defs should be rendered by the host app as normal sibl
 
 <h2></h2>
 
+###### **— NODE —**
+
 <details><summary><b><code>runWorkbenchCompile</code></b>: <em>run a tiny host compile script</em></summary><br /><ul><div>
 
 <b>Usage:</b><br />
@@ -123,7 +126,7 @@ import { runWorkbenchCompile } from "demo-workbench/node";
 
 runWorkbenchCompile({
   styles: {
-    inputDir: "titans_rc/styles/scss",
+    inputDir: "src/styles/scss",
     outputDir: "src/styles/workbench-css",
     assetUrlPrefix: "http://localhost:3000/img/",
     clean: true,
@@ -134,32 +137,52 @@ runWorkbenchCompile({
 
 Run it as a command:
 
+###### **— one launch —**
+
 ```bash
 ts-node src/scripts/workbenchCompile.ts
 ```
 
-Run the same file with `--watch` to start watch mode:
+###### **— watch mode —**
 
 ```bash
 ts-node src/scripts/workbenchCompile.ts --watch
 ```
 
-Pass `logs: false` when the host script should stay quiet, including Sass warnings:
+The host builder/dev-server must expose `styles.outputDir` at `/workbench-css/`:
+
+```ts
+// webpack-dev-server example
+static: [
+  {
+    directory: path.join("src", "styles", "workbench-css"),
+    publicPath: "/workbench-css/",
+    watch: false,
+  },
+];
+```
+
+The command always prints compact CLI progress. Sass/CSS compiler warnings and debug output are visible by default; pass `styleLogs: false` only when you want to hide that compiler output:
 
 ```ts
 runWorkbenchCompile({
-  styles: {
-    inputDir: "titans_rc/styles/scss",
-    outputDir: "src/styles/workbench-css",
-  },
-  demos: { inputDir: "src/components/pages" },
-  logs: false,
+  styles: {...},
+  demos: {...},
+  styleLogs: false,
 });
 ```
 
 <b>Description:</b><em><br />
-Reads <code>process.argv</code>, runs one compile by default, and switches to watch mode for <code>--watch</code> or <code>watch</code>. Watch mode enables style reload by default, handles <code>SIGINT</code>/<code>SIGTERM</code> cleanup, and logs command-style output. Full builds log compact counts; single style rebuilds log the changed CSS file name.
+This is the main Node entry point for host projects. It reads <code>process.argv</code>, runs one compile by default, and switches to watch mode for <code>--watch</code> or <code>watch</code>. It generates the demo registry, compiles project CSS, starts watch mode, enables style reload, handles <code>SIGINT</code>/<code>SIGTERM</code> cleanup, and prints compact CLI-style logs.
 </em><br />
+
+```text
+📋 demo-workbench
+— preparing...
+✓ styles compiled (12)
+✓ demos discovered (54)
+✓ style reload enabled
+```
 
 <b>Signature:</b><br />
 
@@ -167,6 +190,40 @@ Reads <code>process.argv</code>, runs one compile by default, and switches to wa
 function runWorkbenchCompile(
   options: WorkbenchCompileCommandOptions,
 ): Promise<WorkbenchCompileResult | WorkbenchCompileWatchResult | undefined>;
+```
+
+</div></ul></details>
+
+<h2></h2>
+
+###### **— PATTERNS —**
+
+<details><summary><b>Opened-demo auto scale</b></summary><br /><ul><div>
+
+```tsx
+// Default behavior: no workbench auto scale.
+<DemoWorkbench />
+
+// Fixed game/screen workspace.
+<DemoWorkbench autoScale={{ width: 1200, height: 640 }} />
+
+// Scale by width only; the demo owns its height responsiveness.
+<DemoWorkbench autoScale={{ width: 1200, height: null }} />
+
+// Explicit no-op, useful when autoScale is toggled from config.
+<DemoWorkbench autoScale={false} />
+```
+
+</div></ul></details>
+
+<details><summary><b>Style compiler logs</b></summary><br /><ul><div>
+
+```ts
+// Default: compact CLI progress plus Sass/CSS compiler output.
+runWorkbenchCompile({ styles, demos });
+
+// Keep CLI progress, hide Sass/CSS compiler warnings.
+runWorkbenchCompile({ styles, demos, styleLogs: false });
 ```
 
 </div></ul></details>

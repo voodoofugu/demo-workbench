@@ -67,6 +67,21 @@ test("package-prepare creates a package with valid root and node export targets"
   }
 });
 
+test("node package entry exposes only the command runner", async () => {
+  const nodeApi = await import("../dist/node/index.js");
+  const nodeTypes = await readFile(
+    path.join(publishDir, "dist/node/index.d.ts"),
+    "utf8",
+  );
+
+  assert.deepEqual(Object.keys(nodeApi).sort(), ["runWorkbenchCompile"]);
+  assert.match(nodeTypes, /export \{ runWorkbenchCompile \}/);
+  assert.doesNotMatch(
+    nodeTypes,
+    /export \{[^}]*\b(?:workbenchCompile|watchWorkbenchCompile|discoverWorkbenchFileNames)\b/,
+  );
+});
+
 test("publish package contains only public package artifacts", async () => {
   const files = await listFiles(publishDir);
   const cssFiles = files.filter((file) => file.endsWith(".css"));
@@ -84,6 +99,25 @@ test("publish package contains only public package artifacts", async () => {
     "package.json",
   ]);
   assert.deepEqual(cssFiles, []);
+});
+
+test("published bundles ship an empty generated registry", async () => {
+  // Host projects patch the registry inside their own node_modules copy;
+  // the published package must never carry demo names from a host project.
+  const registrySource = await readFile(
+    path.join(root, "src/state/generatedWorkbenchRegistry.ts"),
+    "utf8",
+  );
+  assert.match(registrySource, /demos:\s*\[\]/);
+
+  for (const bundle of ["dist/index.js", "dist/index.cjs"]) {
+    const bundledCode = await readFile(path.join(publishDir, bundle), "utf8");
+    assert.match(
+      bundledCode,
+      /generatedWorkbenchRegistry\s*=\s*\{\s*demos:\s*\[\]\s*\}/,
+      `${bundle} must contain an empty generated registry`,
+    );
+  }
 });
 
 test("example pages cover multiple pages with their own css files", async () => {

@@ -1,6 +1,6 @@
-import type { DemoWorkbenchStorageEntry } from "../types/public";
+import type { DemoWorkbenchStorageEntry } from "../types/internal";
 import type { WorkbenchState } from "../state/nexus";
-import { getBrowserStorage, parseStoredValue } from "./storage.js";
+import { readStoredEntries } from "./storage.js";
 
 export function normalizeStorageEntries(
   storageData: DemoWorkbenchStorageEntry[] = [],
@@ -18,16 +18,5 @@ export function normalizeStorageEntries(
 export function readStoredWorkbenchState(
   storageData: DemoWorkbenchStorageEntry[] = [],
 ): Partial<WorkbenchState> {
-  const restoredState: Partial<WorkbenchState> = {};
-
-  normalizeStorageEntries(storageData).forEach((item) => {
-    const storage = getBrowserStorage(item.type);
-    const value = parseStoredValue(storage?.getItem(item.name) ?? null);
-
-    if (value !== undefined) {
-      (restoredState as Record<string, unknown>)[item.name] = value;
-    }
-  });
-
-  return restoredState;
+  return readStoredEntries(normalizeStorageEntries(storageData)) as Partial<WorkbenchState>;
 }

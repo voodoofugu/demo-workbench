@@ -12,6 +12,7 @@
     "url": "https://github.com/voodoofugu/demo-workbench/issues"
   },
   "homepage": "https://github.com/voodoofugu/demo-workbench#readme",
+  "private": true,
   "type": "module",
   "sideEffects": false,
   "main": "./dist/index.cjs",
@@ -43,20 +44,19 @@
   ],
   "scripts": {
     "dev": "vite --host 127.0.0.1 --open",
-    "build": "rollup -c",
+    "build": "node scripts/reset-registry.mjs && rollup -c",
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm run build && npm test && npm run pack:dry",
     "pack:dry": "npm pack --dry-run",
     "package-prepare": "npm run build && node scripts/prepare-publish.mjs",
-    "publish:dry": "npm run package-prepare && npm publish ./publish --dry-run",
-    "publish": "npm run package-prepare && npm publish ./publish --access public",
+    "release:dry": "npm run package-prepare && npm publish ./publish --dry-run",
+    "release": "npm run package-prepare && npm publish ./publish --access public",
     "test": "npm run package-prepare && node --test test/*.test.mjs"
   },
   "dependencies": {
     "chokidar": "^5.0.0",
-    "keytask-core": "^1.0.0",
     "lightningcss": "^1.32.0",
-    "morphing-scroll": "^2.10.5",
+    "morphing-scroll": "^2.10.6",
     "nexus-state": "^3.1.0",
     "sass-embedded": "^1.100.0",
     "styled-atom": "^3.0.3"

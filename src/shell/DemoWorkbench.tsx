@@ -1,57 +1,46 @@
-import type { ComponentType } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { StyledAtom as InlineStyledAtom } from "styled-atom";
+import StyledAtom from "styled-atom";
 import type {
   ImportStyleResult,
   ImportStyle,
   StyleAtomCssReplacement,
 } from "styled-atom";
 
-import { StyledAtom, workbenchStyleAtoms } from "../styles/styledAtom";
+import {
+  StyledAtom as WorkbenchStyledAtom,
+  workbenchStyleAtoms,
+} from "../styles/styledAtom";
 import workbenchStyles from "../styles/workbenchStyles";
-import RawWorkbenchStorage from "../state/WorkbenchStorage";
+import WorkbenchStorage from "../state/WorkbenchStorage";
 import generatedWorkbenchRegistry from "../state/generatedWorkbenchRegistry";
-import { WorkbenchStateProvider } from "../state/WorkbenchState";
-import { useStableStringList } from "../utils/useStableStringList";
-import { getHashWorkbenchState } from "../utils/workbenchPosition";
-import { readStoredWorkbenchState } from "../utils/workbenchStorageState";
-import RawWorkbenchShell from "./WorkbenchShell";
+import { defaultStorageData } from "../state/nexus";
+import { WorkbenchHostCssFilesProvider } from "../state/WorkbenchHostCssFilesContext";
+import { warnDevelopment } from "../utils/devWarnings";
+import { useStableStringList } from "../hooks/useStableStringList";
+import WorkbenchShell from "./WorkbenchShell";
 import WorkbenchTitle from "./WorkbenchTitle";
 
-import type {
-  DemoItem,
-  DemoWorkbenchInitialState,
-  DemoWorkbenchProps,
-  DemoWorkbenchStorageEntry,
-  DemoWorkbenchViewport,
-} from "../types/public";
+import type { DemoWorkbenchProps } from "../types/public";
 
-const TypedWorkbenchStorage = RawWorkbenchStorage as ComponentType<{
-  storageData: DemoWorkbenchStorageEntry[];
-}>;
-
-const TypedWorkbenchShell = RawWorkbenchShell as ComponentType<{
-  title: string;
-  demos: DemoItem[];
-  viewport: DemoWorkbenchViewport;
-  renderDemoContent: DemoWorkbenchProps["renderDemoContent"];
-  bodyBg: DemoWorkbenchProps["bodyBg"];
-  notFoundComponent: DemoWorkbenchProps["notFoundComponent"];
-}>;
-
-const defaultStorageData: DemoWorkbenchStorageEntry[] = [
-  ["activePage"],
-  ["darkTheme", "local"],
-  ["searchData"],
-  ["searchText"],
-  ["pageData"],
-  ["scrollTop"],
-  ["windowScale"],
-];
-
-const defaultViewport: DemoWorkbenchViewport = { width: 1200, height: 640 };
 const emptyCssLoader = () => Promise.resolve();
+const DEFAULT_STYLE_RELOAD_MANIFEST_URL =
+  "/workbench-css/demo-workbench-style-reload.json";
 const STYLE_RELOAD_MANIFEST_POLL_MS = 2000;
+
+function isLocalWorkbenchHost() {
+  if (typeof window === "undefined") return false;
+
+  return (
+    window.location.hostname === "localhost" ||
+    window.location.hostname === "127.0.0.1" ||
+    window.location.hostname === "0.0.0.0" ||
+    window.location.hostname === "::1"
+  );
+}
+
+function getDefaultStyleReloadManifestUrl() {
+  return isLocalWorkbenchHost() ? DEFAULT_STYLE_RELOAD_MANIFEST_URL : undefined;
+}
 
 function readStyleReloadFileNames(event: MessageEvent) {
   try {
@@ -117,7 +106,41 @@ async function loadStyleReloadUrlFromManifest(manifestUrl: string) {
 }
 
 function WorkbenchGlobalStyles({ hostFileNames }: { hostFileNames: string[] }) {
-  return hostFileNames.length ? <StyledAtom files={hostFileNames} /> : null;
+  return hostFileNames.length ? (
+    <WorkbenchStyledAtom files={hostFileNames} />
+  ) : null;
+}
+
+function warnMissingStyleLoader(fileNames: readonly string[]) {
+  if (!fileNames.length) return;
+
+  warnDevelopment(
+    "missing-style-loader",
+    `styleLoader is missing, but styles are requested (${fileNames.join(", ")}). Pass styleLoader or remove baseStyles/cssFiles.`,
+  );
+}
+
+function warnInvalidDemoModule(name: string) {
+  warnDevelopment(
+    `invalid-demo-module:${name}`,
+    `demoLoader("${name}") returned a module without a default React component.`,
+  );
+}
+
+function warnFailedDemoLoad(name: string, error: unknown) {
+  warnDevelopment(
+    `failed-demo-load:${name}`,
+    `demoLoader("${name}") failed.`,
+    error,
+  );
+}
+
+function warnFailedStyleLoad(fileName: string, error: unknown) {
+  warnDevelopment(
+    `failed-style-load:${fileName}`,
+    `style "${fileName}" failed to load.`,
+    error,
+  );
 }
 
 /**---
@@ -125,13 +148,14 @@ function WorkbenchGlobalStyles({ hostFileNames }: { hostFileNames: string[] }) {
  * ### ***DemoWorkbench***:
  * searchable React shell for local component and screen demos.
  * @description
- * Renders the full reusable workbench UI: header, search, theme toggle, scrollable demo grid, loading state, opened-demo modal and persisted shell state. `workbenchCompile` supplies the generated demo registry; the host project supplies a `demoLoader`, style loading and optional render hooks while `demo-workbench` owns the repeated shell behavior.
+ * Renders the full reusable workbench UI: header, search, theme toggle, scrollable demo grid, loading state, opened-demo modal and persisted shell state. `runWorkbenchCompile` supplies the generated demo registry; the host project supplies a `demoLoader`, style loading and optional render hooks while `demo-workbench` owns the repeated shell behavior. For local style reload, serve the compiled style output directory as `/workbench-css/`.
  * @example
  * ```tsx
  * <DemoWorkbench
  *   title="Project demos"
  *   demoLoader={(name) => import(`./pages/${name}`)}
  *   styleLoader={(name) => import(`./workbench-css/${name}.css`)}
+ *   baseStyles={["output", "theme"]}
  * />
  * ```
  */
@@ -139,12 +163,9 @@ export default function DemoWorkbench({
   title = "Demo Workbench",
   demoLoader,
   styleLoader,
-  styleReloadUrl,
-  styleReloadManifestUrl,
+  baseStyles,
   baseCssFiles,
-  storageData = defaultStorageData,
-  viewport = defaultViewport,
-  initialState,
+  autoScale,
   renderDemoContent,
   bodyBg,
   notFoundComponent,
@@ -154,12 +175,8 @@ export default function DemoWorkbench({
   const [manifestStyleReloadUrl, setManifestStyleReloadUrl] = useState<
     string | undefined
   >();
-  const directStyleReloadUrl =
-    styleReloadUrl === false ? undefined : styleReloadUrl;
-  const resolvedStyleReloadUrl =
-    styleReloadUrl === undefined
-      ? manifestStyleReloadUrl
-      : directStyleReloadUrl;
+  const resolvedStyleReloadUrl = manifestStyleReloadUrl;
+  const resolvedStyleReloadManifestUrl = getDefaultStyleReloadManifestUrl();
   const styleLoaderRef = useRef(resolvedStyleLoader);
   const styleReloadUrlRef = useRef(resolvedStyleReloadUrl);
 
@@ -172,18 +189,14 @@ export default function DemoWorkbench({
   }, [resolvedStyleReloadUrl]);
 
   useEffect(() => {
-    if (
-      styleReloadUrl !== undefined ||
-      !styleReloadManifestUrl ||
-      typeof window === "undefined"
-    ) {
+    if (!resolvedStyleReloadManifestUrl || typeof window === "undefined") {
       setManifestStyleReloadUrl(undefined);
       return;
     }
 
     let isActive = true;
     const resolvedManifestUrl = new URL(
-      styleReloadManifestUrl,
+      resolvedStyleReloadManifestUrl,
       window.location.href,
     ).toString();
 
@@ -212,7 +225,7 @@ export default function DemoWorkbench({
       isActive = false;
       window.clearInterval(interval);
     };
-  }, [styleReloadManifestUrl, styleReloadUrl]);
+  }, [resolvedStyleReloadManifestUrl]);
 
   const loadStyle = useCallback<ImportStyle>(async (fileName: string) => {
     const reloadUrl = styleReloadUrlRef.current;
@@ -224,7 +237,12 @@ export default function DemoWorkbench({
       }
     }
 
-    return (await styleLoaderRef.current(fileName)) as ImportStyleResult;
+    try {
+      return (await styleLoaderRef.current(fileName)) as ImportStyleResult;
+    } catch (error) {
+      warnFailedStyleLoad(fileName, error);
+      throw error;
+    }
   }, []);
 
   useEffect(() => {
@@ -269,64 +287,52 @@ export default function DemoWorkbench({
     };
   }, [resolvedStyleReloadUrl]);
 
-  const rawHostCssFiles = baseCssFiles ?? ["output"];
+  const rawHostCssFiles = baseStyles ?? baseCssFiles ?? ["output"];
   const hostCssFiles = useStableStringList(rawHostCssFiles);
+
+  useEffect(() => {
+    if (!styleLoader) {
+      warnMissingStyleLoader(hostCssFiles);
+    }
+  }, [hostCssFiles, styleLoader]);
 
   const registryDemos = useMemo(
     () =>
       generatedWorkbenchRegistry.demos.map((name) => ({
         name,
-        load: () => demoLoader(name),
+        load: async () => {
+          try {
+            const module = await demoLoader(name);
+
+            if (!module?.default) {
+              warnInvalidDemoModule(name);
+            }
+
+            return module;
+          } catch (error) {
+            warnFailedDemoLoad(name, error);
+            throw error;
+          }
+        },
       })),
     [demoLoader],
   );
-  const restoredInitialState = useMemo<DemoWorkbenchInitialState>(() => {
-    const hashState = getHashWorkbenchState();
-    const storedState = (
-      hashState ? {} : readStoredWorkbenchState(storageData)
-    ) as Partial<DemoWorkbenchInitialState>;
-    const nextInitialState: DemoWorkbenchInitialState = {
-      ...storedState,
-      ...(hashState
-        ? {
-            activePage: hashState.activePage,
-            pageData: {
-              scrollTop: hashState.scrollTop,
-              top: 0,
-              left: 0,
-            },
-            searchText: hashState.searchText,
-            scrollTop: hashState.scrollTop,
-          }
-        : {}),
-      ...initialState,
-    };
-
-    if (nextInitialState.windowScale == null) {
-      delete nextInitialState.windowScale;
-    }
-
-    return {
-      ...nextInitialState,
-      baseCssFiles: hostCssFiles,
-    } as DemoWorkbenchInitialState;
-  }, [hostCssFiles, initialState, storageData]);
 
   return (
-    <InlineStyledAtom name="demo-workbench" encap styles={workbenchStyles}>
-      <WorkbenchStateProvider initialState={restoredInitialState}>
+    <StyledAtom name="demo-workbench" encap styles={workbenchStyles}>
+      <WorkbenchHostCssFilesProvider files={hostCssFiles}>
         <WorkbenchGlobalStyles hostFileNames={hostCssFiles} />
         <WorkbenchTitle title={title} />
-        <TypedWorkbenchStorage storageData={storageData} />
-        <TypedWorkbenchShell
+        <WorkbenchStorage storageData={defaultStorageData} />
+        <WorkbenchShell
           title={title}
           demos={registryDemos}
-          viewport={viewport}
+          autoScale={autoScale}
           renderDemoContent={renderDemoContent}
           bodyBg={bodyBg}
           notFoundComponent={notFoundComponent}
         />
-      </WorkbenchStateProvider>
-    </InlineStyledAtom>
+      </WorkbenchHostCssFilesProvider>
+    </StyledAtom>
   );
 }

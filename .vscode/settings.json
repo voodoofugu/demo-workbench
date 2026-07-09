@@ -1,0 +1,6 @@
+{
+  // Show editable color swatches for hex/rgb/hsl literals in every language,
+  // including .ts/.tsx (e.g. the palettes in src/styles/workbenchStyles.ts).
+  // VS Code < 1.94 expects a boolean here — use `true` on older versions.
+  "editor.defaultColorDecorators": "always"
+}

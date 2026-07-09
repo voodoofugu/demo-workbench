@@ -4,19 +4,25 @@ import path from "node:path";
 import test from "node:test";
 
 const root = path.resolve(import.meta.dirname, "..");
+const removedWorkbenchFacadeHook = new RegExp("useWorkbench" + "Store");
+const removedWorkbenchFacadeFile = ["Workbench", "State.tsx"].join("");
 
-test("DemoGrid reads active page/search/scroll from workbench state, not storage side-effect hook", async () => {
+test("DemoGrid reads active page/search/scroll from nexus, not storage side-effect hook", async () => {
   const demoGrid = await readFile(
     path.join(root, "src/components/DemoGrid.tsx"),
     "utf8",
   );
 
   assert.doesNotMatch(demoGrid, /useStorageItems/);
-  assert.match(demoGrid, /useWorkbenchStore/);
-  assert.match(demoGrid, /setWorkbenchState\(/);
-  assert.match(demoGrid, /activePage/);
-  assert.match(demoGrid, /searchData/);
-  assert.match(demoGrid, /scrollTop/);
+  assert.doesNotMatch(demoGrid, removedWorkbenchFacadeHook);
+  assert.doesNotMatch(demoGrid, /nexus\.use\(\)/);
+  assert.match(demoGrid, /nexus\.use\("activePage"\)/);
+  assert.match(demoGrid, /nexus\.use\("scrollTop"\)/);
+  assert.match(demoGrid, /nexus\.set\(\{/);
+
+  // Search results are derived from searchText, not stored as separate state.
+  assert.doesNotMatch(demoGrid, /searchData/);
+  assert.match(demoGrid, /useDeferredValue\(searchText\)/);
 });
 
 test("workbench state has defaults for restored template state", async () => {
@@ -24,8 +30,8 @@ test("workbench state has defaults for restored template state", async () => {
 
   assert.match(state, /activePage:\s*""/);
   assert.match(state, /pageData:\s*null/);
-  assert.match(state, /searchData:\s*null/);
   assert.match(state, /scrollTop:\s*0/);
+  assert.doesNotMatch(state, /searchData/);
 });
 
 test("DemoCell card markup matches workbench cell shell", async () => {
@@ -100,12 +106,12 @@ test("buttons use safe click semantics and nexus functional updates", async () =
   assert.doesNotMatch(toggleButton, /darkTheme:\s*\([^)]*\)\s*=>/);
   assert.match(
     demoGrid,
-    /setWorkbenchState\(\{[\s\S]*pageData:[\s\S]*activePage:/,
+    /nexus\.set\(\{[\s\S]*pageData:[\s\S]*activePage:/,
   );
-  assert.match(demoGrid, /setWorkbenchState\(\{ scrollTop:/);
+  assert.match(demoGrid, /nexus\.set\(\{ scrollTop:/);
 });
 
-test("storage hydrates nexus once and subscribes to later state changes", async () => {
+test("storage hook only subscribes and persists future state changes", async () => {
   const storageHook = await readFile(
     path.join(root, "src/hooks/useStorageItems.js"),
     "utf8",
@@ -118,63 +124,92 @@ test("storage hydrates nexus once and subscribes to later state changes", async 
   assert.doesNotMatch(storageHook, /useState/);
   assert.doesNotMatch(storageHook, /setTimeout/);
   assert.doesNotMatch(storageHook, /readyToWrite|hydratedRef/);
+  assert.doesNotMatch(storageHook, /hydrateInitial/);
+  assert.doesNotMatch(storageHook, /hydratedStorageKeys/);
+  assert.doesNotMatch(storageHook, /store\.set\(/);
   assert.match(storageHook, /getBrowserStorage/);
-  assert.match(storageHook, /hydratedStorageKeys = new WeakMap\(\)/);
-  assert.match(storageHook, /!hydratedKeys\.has\(entriesKey\)/);
-  assert.match(storageHook, /hydratedKeys\.add\(entriesKey\)/);
-  assert.match(storageHook, /restoredState\[item\.name\] = value/);
-  assert.match(storageHook, /store\.set\(restoredState\)/);
   assert.match(storageHook, /store\.subscribe\(writeState/);
   assert.match(storageHook, /state\[item\.name\]/);
-  assert.match(
-    workbenchStorage,
-    /useStorageItems\(storageData, nexus, false\)/,
-  );
-  assert.doesNotMatch(workbenchStorage, /useWorkbenchStore/);
+  assert.match(workbenchStorage, /useStorageItems\(storageData, nexus\)/);
+  assert.doesNotMatch(workbenchStorage, removedWorkbenchFacadeHook);
 });
 
-test("DemoWorkbench restores state before rendering children without setting nexus during render", async () => {
-  const [demoWorkbench, workbenchState, storageState] = await Promise.all([
+test("nexus seeds itself from hash/storage at module init instead of a render-blocking gate", async () => {
+  const [nexusState, demoWorkbench, storageState] = await Promise.all([
+    readFile(path.join(root, "src/state/nexus.ts"), "utf8"),
     readFile(path.join(root, "src/shell/DemoWorkbench.tsx"), "utf8"),
-    readFile(path.join(root, "src/state/WorkbenchState.tsx"), "utf8"),
     readFile(path.join(root, "src/utils/workbenchStorageState.ts"), "utf8"),
   ]);
 
-  assert.match(demoWorkbench, /readStoredWorkbenchState\(storageData\)/);
-  assert.match(demoWorkbench, /activePage: hashState\.activePage/);
-  assert.match(demoWorkbench, /scrollTop: hashState\.scrollTop/);
-  assert.match(demoWorkbench, /top:\s*0/);
-  assert.match(demoWorkbench, /left:\s*0/);
-  assert.match(workbenchState, /useLayoutEffect/);
-  assert.match(workbenchState, /nexus\.set\(resolvedInitialState\)/);
-  assert.match(
-    workbenchState,
-    /if \(appliedInitialStateKey !== resolvedInitialStateKey\) return null/,
-  );
+  assert.match(nexusState, /export const defaultStorageData/);
+  assert.match(nexusState, /getHashWorkbenchState\(\)/);
+  assert.match(nexusState, /readStoredWorkbenchState\(defaultStorageData\)/);
+  assert.match(nexusState, /activePage: hashState\.activePage/);
+  assert.match(nexusState, /scrollTop: hashState\.scrollTop/);
+  // The card position parsed from the hash must survive into pageData so
+  // closing a demo opened in a new tab shrinks it back onto its card.
+  assert.match(nexusState, /top: hashState\.top/);
+  assert.match(nexusState, /left: hashState\.left/);
+  assert.match(nexusState, /\.\.\.getInitialWorkbenchState\(\)/);
+  assert.doesNotMatch(nexusState, /baseCssFiles/);
+
+  assert.doesNotMatch(demoWorkbench, /WorkbenchStateProvider/);
+  assert.doesNotMatch(demoWorkbench, /restoredInitialState/);
   assert.doesNotMatch(demoWorkbench, /nexus\.set/);
+  assert.match(
+    demoWorkbench,
+    /import \{ defaultStorageData \} from "\.\.\/state\/nexus"/,
+  );
+  assert.match(
+    demoWorkbench,
+    /WorkbenchHostCssFilesProvider files=\{hostCssFiles\}/,
+  );
 
   assert.match(storageState, /normalizeStorageEntries/);
-  assert.match(storageState, /getBrowserStorage\(item\.type\)/);
-  assert.match(storageState, /parseStoredValue/);
-  assert.match(storageState, /restoredState/);
+  assert.match(storageState, /readStoredEntries\(normalizeStorageEntries\(storageData\)\)/);
+  await assert.rejects(
+    readFile(path.join(root, "src/state", removedWorkbenchFacadeFile), "utf8"),
+    { code: "ENOENT" },
+  );
 });
 
-test("DemoWorkbench keeps one stable baseCssFiles list and owns shell styles inline", async () => {
+test("baseCssFiles reaches DemoCell via context, not the global nexus store", async () => {
+  const [demoCell, hostContext] = await Promise.all([
+    readFile(path.join(root, "src/components/DemoCell.tsx"), "utf8"),
+    readFile(
+      path.join(root, "src/state/WorkbenchHostCssFilesContext.tsx"),
+      "utf8",
+    ),
+  ]);
+
+  assert.match(demoCell, /useWorkbenchHostCssFiles/);
+  assert.doesNotMatch(demoCell, /state\.baseCssFiles/);
+  assert.match(hostContext, /createContext<string\[\]>/);
+  assert.match(hostContext, /WorkbenchHostCssFilesProvider/);
+});
+
+test("DemoWorkbench keeps stable baseStyles and owns shell styles inline", async () => {
   const [
     publicTypes,
     demoWorkbench,
+    workbenchShell,
     demoCell,
     styledAtomBridge,
     workbenchStyles,
+    loading,
   ] = await Promise.all([
     readFile(path.join(root, "src/types/public.ts"), "utf8"),
     readFile(path.join(root, "src/shell/DemoWorkbench.tsx"), "utf8"),
+    readFile(path.join(root, "src/shell/WorkbenchShell.tsx"), "utf8"),
     readFile(path.join(root, "src/components/DemoCell.tsx"), "utf8"),
     readFile(path.join(root, "src/styles/styledAtom.ts"), "utf8"),
     readFile(path.join(root, "src/styles/workbenchStyles.ts"), "utf8"),
+    readFile(path.join(root, "src/components/feedback/Loading.tsx"), "utf8"),
   ]);
 
+  assert.match(publicTypes, /baseStyles\?:\s*string\[\]/);
   assert.match(publicTypes, /baseCssFiles\?:\s*string\[\]/);
+  assert.match(publicTypes, /@deprecated Use `baseStyles` instead/);
   assert.match(publicTypes, /cssFiles\?:\s*string\[\]/);
   assert.match(publicTypes, /demoLoader:\s*DemoWorkbenchDemoLoader/);
   assert.doesNotMatch(publicTypes, /demos\?:\s*DemoItem\[\]/);
@@ -187,7 +222,7 @@ test("DemoWorkbench keeps one stable baseCssFiles list and owns shell styles inl
   assert.doesNotMatch(publicTypes, /baseCssVars/);
   assert.match(
     demoWorkbench,
-    /rawHostCssFiles = baseCssFiles \?\? \["output"\]/,
+    /rawHostCssFiles = baseStyles \?\? baseCssFiles \?\? \["output"\]/,
   );
   assert.match(
     demoWorkbench,
@@ -205,7 +240,12 @@ test("DemoWorkbench keeps one stable baseCssFiles list and owns shell styles inl
   );
   assert.doesNotMatch(demoWorkbench, /vars=\{baseCssVars\}/);
   assert.doesNotMatch(demoWorkbench, /orderedCssFiles/);
-  assert.match(demoWorkbench, /StyledAtom as InlineStyledAtom/);
+  assert.match(demoWorkbench, /import StyledAtom from "styled-atom"/);
+  assert.match(
+    demoWorkbench,
+    /StyledAtom as WorkbenchStyledAtom/,
+  );
+  assert.match(loading, /import StyledAtom, \{ type StyledAtomStyles \}/);
   assert.match(
     demoWorkbench,
     /name="demo-workbench" encap styles=\{workbenchStyles\}/,
@@ -214,9 +254,32 @@ test("DemoWorkbench keeps one stable baseCssFiles list and owns shell styles inl
   assert.doesNotMatch(demoWorkbench, /WORKBENCH_STYLE_ATOM/);
   assert.match(workbenchStyles, /demo-workbench-shell/);
   assert.match(workbenchStyles, /data-demo-workbench-theme="dark"/);
-  assert.match(publicTypes, /styleReloadUrl\?:\s*string \| false/);
-  assert.match(publicTypes, /styleReloadManifestUrl\?:\s*string \| false/);
+  assert.doesNotMatch(publicTypes, /styleReloadUrl\?:/);
+  assert.doesNotMatch(publicTypes, /styleReloadManifestUrl\?:/);
+  assert.doesNotMatch(publicTypes, /storageData\?:/);
+  assert.doesNotMatch(publicTypes, /initialState\?:/);
+  assert.match(publicTypes, /DemoWorkbenchAutoScaleOptions \| false/);
+  assert.match(publicTypes, /width\?:\s*DemoWorkbenchAutoScaleDimension/);
+  assert.match(publicTypes, /height\?:\s*DemoWorkbenchAutoScaleDimension/);
+  assert.match(publicTypes, /export type DemoWorkbenchAutoScale/);
+  assert.match(publicTypes, /autoScale\?:\s*DemoWorkbenchAutoScale/);
+  assert.doesNotMatch(publicTypes, /DemoWorkbenchViewport/);
+  assert.doesNotMatch(publicTypes, /viewport\?:/);
+  assert.doesNotMatch(demoWorkbench, /defaultViewport/);
+  assert.match(demoWorkbench, /autoScale=\{autoScale\}/);
+  assert.match(workbenchShell, /getAutoScaleOptions\(autoScale\)/);
+  assert.match(workbenchShell, /autoScale === false \? undefined : autoScale/);
+  assert.match(workbenchShell, /autoScaleOptions\?\.width \?\? null/);
+  assert.match(workbenchShell, /autoScaleOptions\?\.height \?\? null/);
+  assert.match(workbenchShell, /nexus\.set\(\{ windowScale: 0 \}\)/);
+  assert.match(workbenchShell, /getScaleForAxis\(width, autoScaleWidth\)/);
+  assert.match(workbenchShell, /getScaleForAxis\(height, autoScaleHeight\)/);
+  assert.doesNotMatch(workbenchStyles, /normalizeStyledAtomStyles/);
+  assert.doesNotMatch(loading, /normalizeStyledAtomStyles/);
+  assert.doesNotMatch(workbenchStyles, /content:\s*'""'/);
+  assert.doesNotMatch(loading, /content:\s*'""'/);
   assert.match(demoWorkbench, /loadStyleReloadUrlFromManifest/);
+  assert.match(demoWorkbench, /DEFAULT_STYLE_RELOAD_MANIFEST_URL/);
   assert.match(demoWorkbench, /STYLE_RELOAD_MANIFEST_POLL_MS/);
   assert.match(
     demoWorkbench,
@@ -231,7 +294,7 @@ test("DemoWorkbench keeps one stable baseCssFiles list and owns shell styles inl
   assert.doesNotMatch(styledAtomBridge, /StyledAtomStoreOptionsT/);
   assert.match(demoWorkbench, /styleLoaderRef/);
   assert.match(demoCell, /stableCssFiles = useStableStringList\(cssFiles\)/);
-  assert.match(demoCell, /\.\.\.state\.baseCssFiles, \.\.\.stableCssFiles/);
+  assert.match(demoCell, /\.\.\.baseCssFiles, \.\.\.stableCssFiles/);
   assert.match(demoCell, /className:\s*scopeClassName \|\| undefined/);
   assert.match(demoCell, /toWorkbenchStyleClassName/);
   assert.match(styledAtomBridge, /createStyledAtomStore/);
@@ -244,29 +307,50 @@ test("DemoWorkbench keeps one stable baseCssFiles list and owns shell styles inl
     /import nexus from "\.\.\/state\/nexus"/,
   );
   assert.match(styledAtomBridge, /createdStyleAtoms\.StyledAtom/);
-  assert.doesNotMatch(demoCell, /\.\.\.baseCssFiles/);
   assert.doesNotMatch(demoWorkbench, /shellCssFiles/);
 });
 
 test("default storage persists opened page as well as scroll/page data", async () => {
-  const demoWorkbench = await readFile(
-    path.join(root, "src/shell/DemoWorkbench.tsx"),
+  const nexusState = await readFile(
+    path.join(root, "src/state/nexus.ts"),
     "utf8",
   );
 
-  assert.match(demoWorkbench, /\["activePage"\]/);
-  assert.match(demoWorkbench, /\["searchData"\]/);
-  assert.match(demoWorkbench, /\["pageData"\]/);
-  assert.match(demoWorkbench, /\["scrollTop"\]/);
-  assert.match(demoWorkbench, /\["windowScale"\]/);
+  // Every persisted key lives in one storage (localStorage) so the choice is
+  // consistent and theme preferences survive a browser restart.
+  assert.match(nexusState, /\["activePage", "local"\]/);
+  assert.match(nexusState, /\["darkTheme", "local"\]/);
+  assert.match(nexusState, /\["themeColor", "local"\]/);
+  assert.match(nexusState, /\["searchText", "local"\]/);
+  assert.match(nexusState, /\["pageData", "local"\]/);
+  assert.match(nexusState, /\["scrollTop", "local"\]/);
+  // Derived/recomputed values must not be persisted.
+  assert.doesNotMatch(nexusState, /"searchData"/);
+  assert.doesNotMatch(nexusState, /"windowScale"/);
+  // No session-storage entries remain; storage is unified.
+  assert.doesNotMatch(nexusState, /"session"/);
 });
 
-test("DemoGrid tracks rendered demos during virtual scrolling and DemoCell restores Tooltip on info badge", async () => {
-  const [demoGrid, demoCell, tooltip, fileIcon] = await Promise.all([
+test("development warnings cover common host integration mistakes", async () => {
+  const [demoWorkbench, demoGrid, devWarnings] = await Promise.all([
+    readFile(path.join(root, "src/shell/DemoWorkbench.tsx"), "utf8"),
+    readFile(path.join(root, "src/components/DemoGrid.tsx"), "utf8"),
+    readFile(path.join(root, "src/utils/devWarnings.ts"), "utf8"),
+  ]);
+
+  assert.match(devWarnings, /NODE_ENV !== "production"/);
+  assert.match(devWarnings, /shownWarnings/);
+  assert.match(demoWorkbench, /warnMissingStyleLoader/);
+  assert.match(demoWorkbench, /warnFailedStyleLoad/);
+  assert.match(demoWorkbench, /warnInvalidDemoModule/);
+  assert.match(demoWorkbench, /warnFailedDemoLoad/);
+  assert.match(demoGrid, /missing-demo:/);
+});
+
+test("DemoGrid tracks rendered demos during virtual scrolling", async () => {
+  const [demoGrid, demoCell] = await Promise.all([
     readFile(path.join(root, "src/components/DemoGrid.tsx"), "utf8"),
     readFile(path.join(root, "src/components/DemoCell.tsx"), "utf8"),
-    readFile(path.join(root, "src/components/Tooltip.tsx"), "utf8"),
-    readFile(path.join(root, "src/components/icons/FileIcn.tsx"), "utf8"),
   ]);
 
   assert.match(demoGrid, /renderedDemoNames/);
@@ -287,13 +371,11 @@ test("DemoGrid tracks rendered demos during virtual scrolling and DemoCell resto
   assert.doesNotMatch(demoCell, /document\.getElementById\(pageName\)/);
   assert.match(demoCell, /shouldRenderFallback\s*=\s*Boolean/);
   assert.match(demoCell, /isScrolling && !hasLoadedObject/);
-  assert.match(demoCell, /state\.activePage/);
+  assert.match(demoCell, /nexus\.use\("activePage"\)/);
   assert.doesNotMatch(demoCell, /\{!isScrolling && content\}/);
-  assert.match(demoCell, /<Tooltip text=\{pageName\} position="top">/);
-  assert.match(tooltip, /createPortal/);
-  assert.match(tooltip, /#templateBody > main/);
-  assert.match(tooltip, /<FileIcn/);
-  assert.match(fileIcon, /viewBox="0 0 56 64"/);
+  // The Tooltip component and its portal layer were removed from the shell.
+  assert.doesNotMatch(demoCell, /tooltip-layer/);
+  assert.doesNotMatch(demoCell, /<Tooltip/);
 });
 
 test("DemoGrid derives MorphScroll theme and spacing from workbench state without internal ms-* CSS selectors", async () => {
@@ -302,10 +384,11 @@ test("DemoGrid derives MorphScroll theme and spacing from workbench state withou
     "utf8",
   );
 
-  assert.match(demoGrid, /const darkTheme = Boolean\(state\.darkTheme\)/);
+  assert.match(demoGrid, /const darkTheme = Boolean\(nexus\.use\("darkTheme"\)\)/);
+  // Edge gradient follows the active theme palette via the shared bg lookup.
   assert.match(
     demoGrid,
-    /edgeGradient=\{\{ color: darkTheme \? "#1e1b4b" : "#c7d2fe" \}\}/,
+    /edgeGradient=\{\{ color: getWorkbenchBg\(darkTheme, themeColor\) \}\}/,
   );
   assert.match(demoGrid, /wrapperMargin=\{\[30, 20, 60, 20\]\}/);
   assert.doesNotMatch(demoGrid, /\[&_\.ms-objects-wrapper\]/);
@@ -322,9 +405,22 @@ test("DemoGrid scroll persistence is rAF throttled and does not continuously fee
   assert.match(demoGrid, /scrollFrameRef/);
   assert.match(demoGrid, /requestAnimationFrame/);
   assert.match(demoGrid, /cancelAnimationFrame/);
-  assert.match(demoGrid, /restoredScrollPositionRef/);
   assert.doesNotMatch(
     demoGrid,
     /useEffect\(\(\) => \{\s*if \(hashState\) return;\s*setScrollPosition\(\(prev\) => \(\{ \.\.\.prev, value: savedScrollTop \}\)\);\s*\}, \[hashState, savedScrollTop\]\);/,
+  );
+});
+
+test("DemoGrid seeds MorphScroll's scrollPosition from nexus directly instead of a post-mount restore effect", async () => {
+  const demoGrid = await readFile(
+    path.join(root, "src/components/DemoGrid.tsx"),
+    "utf8",
+  );
+
+  assert.doesNotMatch(demoGrid, /restoredScrollPositionRef/);
+  assert.doesNotMatch(demoGrid, /latestSavedScrollTopRef/);
+  assert.match(
+    demoGrid,
+    /useState<\{[\s\S]*?\}>\(\(\) => \(\{ value: savedScrollTop, updater: false \}\)\)/,
   );
 });

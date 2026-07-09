@@ -9,6 +9,7 @@ import type {
 type CliOptions = WorkbenchCompileStylesOptions & {
   watch?: boolean;
   styleReload?: boolean | WorkbenchStyleReloadOptions;
+  styleLogs?: boolean;
   demoInputDir?: string;
 };
 
@@ -48,6 +49,7 @@ function parseArgs(args: string[]): CliOptions {
         "[--asset-url-prefix http://localhost:3000/img/]",
         "[--pages-input <pagesDir>]",
         "[--clean]",
+        "[--no-style-logs]",
         "[--style-reload]",
         "[--style-reload-port 38297]",
       ].join(" "),
@@ -71,6 +73,9 @@ function parseArgs(args: string[]): CliOptions {
       : undefined,
     assetUrlPrefix: readFlag(args, ["--asset-url-prefix", "--assetUrlPrefix"]),
     clean: hasFlag(args, ["--clean"]),
+    styleLogs: hasFlag(args, ["--no-style-logs", "--silent-styles"])
+      ? false
+      : undefined,
     watch: args[0] === "watch" || hasFlag(args, ["--watch"]),
     styleReload,
     demoInputDir: readFlag(args, [
@@ -95,7 +100,7 @@ function toCompileOptions(options: CliOptions): WorkbenchCompileOptions {
           inputDir: options.demoInputDir,
         }
       : undefined,
-    logs: true,
+    styleLogs: options.styleLogs,
   };
 }
 

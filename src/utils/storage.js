@@ -41,3 +41,18 @@ export function stringifyStoredValue(value) {
 export function shouldRemoveStoredValue(value) {
   return value === undefined || value === null || value === false;
 }
+
+export function readStoredEntries(entries = []) {
+  const restoredState = {};
+
+  entries.forEach((item) => {
+    const storage = getBrowserStorage(item.type);
+    const value = parseStoredValue(storage?.getItem(item.name) ?? null);
+
+    if (value !== undefined) {
+      restoredState[item.name] = value;
+    }
+  });
+
+  return restoredState;
+}

@@ -12,12 +12,3 @@ export function normalizeModuleCssFiles(
   const moduleCssFiles = module?.cssFiles ?? [];
   return Array.isArray(moduleCssFiles) ? moduleCssFiles.filter(Boolean) : [];
 }
-
-export function matchesCssFilter(
-  cssFiles: unknown,
-  selectedCSS?: string,
-): boolean {
-  if (!selectedCSS) return true;
-  if (!Array.isArray(cssFiles)) return false;
-  return (cssFiles as string[]).includes(selectedCSS);
-}

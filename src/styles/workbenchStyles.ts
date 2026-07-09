@@ -1,61 +1,99 @@
 import type { StyledAtomStyles } from "styled-atom";
 
-const colors = {
-  blueGray50: "#f8fafc",
-  blueGray950: "#020617",
-  indigo50: "#eef2ff",
-  indigo100: "#e0e7ff",
-  indigo200: "#c7d2fe",
-  indigo250: "#bbc8fc",
-  indigo300: "#a5b4fc",
-  indigo400: "#818cf8",
-  indigo500: "#6366f1",
-  indigo600: "#4f46e5",
-  indigo700: "#4338ca",
-  indigo800: "#3730a3",
-  indigo900: "#312e81",
-  indigo950: "#1e1b4b",
-  indigo1000: "#1c1842",
-  red500: "#ef4444",
-  yellow400: "#facc15",
-  zinc100: "#f4f4f5",
-  zinc300: "#d4d4d8",
-  zinc500: "#71717a",
-  zinc800: "#27272a",
+type Tokens = Record<string, string>;
+
+/**
+ * Each color preset is defined by just a hue and two saturations. Every surface,
+ * text and accent token is derived from those numbers on a shared lightness
+ * scale — light mode darkens the hue for text, dark mode lightens it — so adding
+ * a theme means picking three numbers, not authoring a dozen colors.
+ */
+type ThemeHsl = { h: number; s: number; sn: number };
+
+const themes: Record<string, ThemeHsl> = {
+  // h: hue; s: chroma of text/accent; sn: chroma of the near-neutral surfaces.
+  grey: { h: 40, s: 6, sn: 5 },
+  blue: { h: 217, s: 55, sn: 34 },
+  brown: { h: 28, s: 42, sn: 28 },
 };
 
-const shadows = {
-  lightInset:
-    "inset -1px -1px 3px #eaecfb, 1px 1px 3px #fff, inset 1px 1px 3px #abb1ed, -1px -1px 3px #969ee9",
-  lightInput:
-    "inset -1px -1px 3px #c0c5f2, 1px 1px 3px #eaecfb, inset 1px 1px 3px #818ae4, -1px -1px 3px #5763db",
-  lightButton:
-    "-1px -1px 2px #fff, inset 1px 1px 2px #dde0f8, 1px 1px 2px #818ae4, inset -1px -1px 2px #abb1ed",
-  floatingButton:
-    "-1px -1px 2px #fff, inset 1px 1px 2px #dde0f8, 1px 1px 2px #818ae4, inset -1px -1px 2px #abb1ed, 0 4px 10px #969ee9",
-  darkInset:
-    "inset -1px -1px 3px #2c3c6e, 1px 1px 3px #3b5093, inset 1px 1px 3px #161e38, -1px -1px 3px #0f1425",
-  darkInput:
-    "inset -1px -1px 3px #abb1ed, 1px 1px 3px #3b5093, inset 1px 1px 3px #25325c, -1px -1px 3px #0f1425",
-  darkButton:
-    "-1px -1px 2px #969ee9, inset 1px 1px 2px #344680, 1px 1px 2px #161e38, inset -1px -1px 2px #1e284a",
-  sun: "inset 0 0 0 2px #818cf8",
-  moon: `inset -4px -4px 0 ${colors.yellow400}`,
-  preview:
-    "0 0 0 10px #c0c5f2, 20px 20px 40px #969ee9, -20px -20px 40px #fff",
-  previewDark:
-    "0 0 0 10px #1e284a, 20px 20px 40px #0f1425, -20px -20px 40px #3b5093",
-  card:
-    "-4px -4px 8px #fff, inset 1px 1px 2px #fff, inset -1px -1px 2px #abb1ed, 4px 4px 8px #abb1ed",
-  cardHover:
-    "0 0 2px 1px #818ae4, -5px -5px 10px #fff, inset 1px 1px 2px #fff, inset -1px -1px 2px #abb1ed, 5px 5px 10px #abb1ed",
-  cardDark:
-    "-4px -4px 8px #3b5093, inset 1px 1px 2px #344680, inset -1px -1px 2px #161e38, 4px 4px 8px #161e38",
-  cardDarkHover:
-    "0 0 2px 1px #818ae4, -5px -5px 10px #3b5093, inset 1px 1px 2px #344680, inset -1px -1px 2px #161e38, 5px 5px 10px #0f1425",
-  tooltip: "inset 1px 1px 2px #fff, inset -1px -1px 2px #969ee9",
-  tooltipDark: "inset 1px 1px 2px #5c73be, inset -1px -1px 2px #25325c",
+const hsl = (h: number, s: number, l: number) =>
+  `hsl(${h} ${Math.round(s * 10) / 10}% ${l}%)`;
+
+// Light mode: text is the hue darkened; surfaces sit near white with a faint
+// tint of the same hue.
+function lightPalette({ h, s, sn }: ThemeHsl): Tokens {
+  return {
+    "--dw-bg": hsl(h, sn, 92.5),
+    "--dw-surface": hsl(h, sn, 98.5),
+    "--dw-surface-hover": hsl(h, sn, 95.5),
+    "--dw-text": hsl(h, s, 40),
+    "--dw-muted": hsl(h, s * 0.75, 43),
+    "--dw-accent": hsl(h, s, 45),
+    "--dw-accent-contrast": hsl(h, sn, 99),
+    "--dw-accent-soft": hsl(h, s * 0.85, 90),
+    "--dw-ring": hsl(h, s, 66),
+    "--dw-danger": "hsl(2 75% 48%)",
+  };
+}
+
+// Dark mode mirrors the same scale: text is the hue lightened; surfaces sit near
+// black with the same tint.
+function darkPalette({ h, s, sn }: ThemeHsl): Tokens {
+  return {
+    "--dw-bg": hsl(h, sn, 10),
+    "--dw-surface": hsl(h, sn, 15),
+    "--dw-surface-hover": hsl(h, sn, 19.5),
+    "--dw-text": hsl(h, s * 0.7, 70),
+    "--dw-muted": hsl(h, s * 0.55, 62),
+    "--dw-accent": hsl(h, s, 70),
+    "--dw-accent-contrast": hsl(h, sn, 12),
+    "--dw-accent-soft": hsl(h, s * 0.7, 24),
+    "--dw-ring": hsl(h, s, 45),
+    "--dw-danger": "hsl(2 80% 71%)",
+  };
+}
+
+// Edges and shadows are theme-agnostic: pure black in light mode, pure white in
+// dark mode, differing only by opacity. Borders are expressed as a 1px inset
+// shadow (`--dw-border`) so a control's edge and its drop shadow live in one
+// `box-shadow` and never depend on the palette color. Palettes below carry only
+// real colors (surfaces, text, accent).
+const lightNeutrals: Tokens = {
+  "--dw-border": "rgba(0, 0, 0, 0.1)",
+  "--dw-shadow-sm": "0 1px 2px rgba(0, 0, 0, 0.05)",
+  "--dw-shadow-md":
+    "0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04)",
+  "--dw-shadow-lg": "0 12px 32px rgba(0, 0, 0, 0.14)",
 };
+
+const darkNeutrals: Tokens = {
+  "--dw-border": "rgba(255, 255, 255, 0.12)",
+  "--dw-shadow-sm": "0 1px 2px rgba(0, 0, 0, 0.4)",
+  "--dw-shadow-md": "0 2px 6px rgba(0, 0, 0, 0.45)",
+  "--dw-shadow-lg": "0 16px 40px rgba(0, 0, 0, 0.6)",
+};
+
+const palettes: Record<string, Tokens> = {
+  "light-grey": lightPalette(themes.grey),
+  "light-blue": lightPalette(themes.blue),
+  "light-brown": lightPalette(themes.brown),
+  "dark-grey": darkPalette(themes.grey),
+  "dark-blue": darkPalette(themes.blue),
+  "dark-brown": darkPalette(themes.brown),
+};
+
+// Menu swatch: the preset hue at a fixed mid lightness, same in light and dark.
+export const themeColorSwatches: Record<string, string> = Object.fromEntries(
+  Object.entries(themes).map(([name, { h, s }]) => [name, hsl(h, s, 52)]),
+);
+
+// MorphScroll's edge gradient needs a concrete color (it can't read a CSS
+// variable), so it resolves the page background from the same derivation.
+export function getWorkbenchBg(darkTheme: boolean, themeColor: string): string {
+  const theme = themes[themeColor] ?? themes.grey;
+  return (darkTheme ? darkPalette : lightPalette)(theme)["--dw-bg"];
+}
 
 const transition = "all 0.15s cubic-bezier(0.4, 0, 0.2, 1)";
 const rootFont =
@@ -74,14 +112,13 @@ const workbenchStyles: StyledAtomStyles = {
   },
 
   "@keyframes demo-workbench-ident": {
-    "0%": {
-      opacity: 0,
-      scale: 0.8,
-    },
-    "100%": {
-      opacity: 1,
-      scale: 1,
-    },
+    "0%": { opacity: 0, scale: 0.96 },
+    "100%": { opacity: 1, scale: 1 },
+  },
+
+  "@keyframes demo-workbench-menu": {
+    "0%": { opacity: 0, transform: "translateX(-50%) translateY(-6px)" },
+    "100%": { opacity: 1, transform: "translateX(-50%) translateY(0)" },
   },
 
   "*, *::before, *::after": {
@@ -111,66 +148,166 @@ const workbenchStyles: StyledAtomStyles = {
     minHeight: "100%",
     overflow: "hidden",
     colorScheme: "light",
+    // Default palette: light grey. Overridden by the attribute blocks below.
+    ...lightNeutrals,
+    ...palettes["light-grey"],
   },
+
+  '.demo-workbench-shell[data-demo-workbench-color="blue"]':
+    palettes["light-blue"],
+  '.demo-workbench-shell[data-demo-workbench-color="brown"]':
+    palettes["light-brown"],
 
   '.demo-workbench-shell[data-demo-workbench-theme="dark"]': {
     colorScheme: "dark",
+    ...darkNeutrals,
+    ...palettes["dark-grey"],
   },
+  '.demo-workbench-shell[data-demo-workbench-theme="dark"][data-demo-workbench-color="blue"]':
+    palettes["dark-blue"],
+  '.demo-workbench-shell[data-demo-workbench-theme="dark"][data-demo-workbench-color="brown"]':
+    palettes["dark-brown"],
 
   ".demo-workbench-layout": {
     position: "fixed",
     width: "100%",
     height: "100%",
     overflow: "hidden",
-    background: colors.indigo200,
+    background: "var(--dw-bg)",
   },
-
-  '.demo-workbench-shell[data-demo-workbench-theme="dark"] .demo-workbench-layout':
-    {
-      background: colors.indigo950,
-    },
 
   ".demo-workbench-header": {
     position: "relative",
-    width: "calc(100% - 80px)",
+    zIndex: 30,
+    display: "flex",
+    alignItems: "center",
+    width: "calc(100% - 20px)",
     maxWidth: 1160,
-    margin: "30px auto",
-    borderRadius: 18,
-    background: colors.indigo250,
-    padding: 10,
-    boxShadow: shadows.lightInset,
+    height: 56,
+    margin: "10px auto",
+    borderRadius: 26,
+    background: "var(--dw-surface)",
+    padding: "0 8px",
+    boxShadow: "inset 0 0 0 1px var(--dw-border), var(--dw-shadow-sm)",
     animation: "demo-workbench-appear 0.3s ease-in-out 0s 1 forwards",
   },
 
-  '.demo-workbench-shell[data-demo-workbench-theme="dark"] .demo-workbench-header':
-    {
-      background: colors.indigo1000,
-      boxShadow: shadows.darkInset,
-    },
+  // — Title / theme-color menu —
+
+  ".demo-workbench-title-wrap": {
+    position: "absolute",
+    left: "50%",
+    top: "50%",
+    transform: "translate(-50%, -50%)",
+    maxWidth: "calc(100% - 180px)",
+  },
 
   ".demo-workbench-title": {
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+    maxWidth: "100%",
+    cursor: "pointer",
+    borderRadius: 8,
+    padding: "6px 12px",
+    color: "var(--dw-text)",
+    fontSize: "1.125rem",
+    fontWeight: 600,
+    lineHeight: "1.5rem",
+    transition,
+  },
+
+  ".demo-workbench-title:hover": {
+    background: "var(--dw-surface-hover)",
+  },
+
+  ".demo-workbench-title-text": {
     overflow: "hidden",
-    padding: "0 90px",
-    color: colors.indigo400,
-    fontSize: "1.5rem",
-    fontStyle: "italic",
-    fontWeight: 700,
-    lineHeight: "2rem",
-    textAlign: "center",
     textOverflow: "ellipsis",
-    textShadow: "0.5px 0.5px 1px rgba(255, 255, 255, 0.6)",
     whiteSpace: "nowrap",
   },
 
-  '.demo-workbench-shell[data-demo-workbench-theme="dark"] .demo-workbench-title':
-    {
-      color: colors.indigo500,
-      textShadow: "0.5px 0.5px 1px rgba(0, 0, 0, 0.8)",
-    },
+  ".demo-workbench-title-caret": {
+    flex: "none",
+    width: 8,
+    height: 8,
+    borderRight: "2px solid var(--dw-muted)",
+    borderBottom: "2px solid var(--dw-muted)",
+    transform: "translateY(-2px) rotate(45deg)",
+    transition,
+  },
+  '.demo-workbench-title[aria-expanded="true"] .demo-workbench-title-caret': {
+    transform: "translateY(2px) rotate(-45deg) scaleY(-1)",
+  },
+
+  ".demo-workbench-theme-menu": {
+    position: "absolute",
+    left: "50%",
+    top: "calc(100% + 8px)",
+    zIndex: 60,
+    display: "flex",
+    flexDirection: "column",
+    gap: 2,
+    minWidth: 160,
+    borderRadius: 12,
+    background: "var(--dw-surface)",
+    boxShadow: "inset 0 0 0 1px var(--dw-border), var(--dw-shadow-lg)",
+    padding: 6,
+    transform: "translateX(-50%)",
+    animation: "demo-workbench-menu 0.14s ease-out 1 forwards",
+  },
+
+  ".demo-workbench-theme-option": {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    width: "100%",
+    cursor: "pointer",
+    borderRadius: 8,
+    padding: "8px 10px",
+    color: "var(--dw-text)",
+    fontSize: "0.875rem",
+    fontWeight: 500,
+    lineHeight: "1.25rem",
+    textAlign: "left",
+    transition,
+  },
+
+  ".demo-workbench-theme-option:hover": {
+    background: "var(--dw-surface-hover)",
+  },
+
+  '.demo-workbench-theme-option[data-active="true"]': {
+    background: "var(--dw-accent-soft)",
+  },
+
+  ".demo-workbench-theme-swatch": {
+    flex: "none",
+    width: 16,
+    height: 16,
+    borderRadius: "50%",
+    boxShadow: "inset 0 0 0 1px var(--dw-border)",
+  },
+
+  ".demo-workbench-theme-option-label": {
+    flex: 1,
+    textTransform: "capitalize",
+  },
+
+  ".demo-workbench-theme-check": {
+    flex: "none",
+    width: 14,
+    height: 8,
+    borderLeft: "2px solid var(--dw-accent)",
+    borderBottom: "2px solid var(--dw-accent)",
+    transform: "translateY(-2px) rotate(-45deg)",
+  },
+
+  // — Search —
 
   ".demo-workbench-search": {
     position: "absolute",
-    left: 10,
+    left: 12,
     top: "50%",
     width: "fit-content",
     height: "fit-content",
@@ -178,47 +315,32 @@ const workbenchStyles: StyledAtomStyles = {
   },
 
   ".demo-workbench-search-input": {
-    width: 0,
-    height: 0,
-    border: "none",
-    borderRadius: 24,
-    outline: "2px solid transparent",
-    outlineOffset: 2,
-    background: colors.indigo300,
-    boxShadow: shadows.lightInput,
-    color: colors.indigo800,
+    width: 32,
+    height: 32,
+    background: "var(--dw-bg)",
+    boxShadow: "inset 0 0 0 1px var(--dw-border)",
+    color: "var(--dw-text)",
     fontSize: "0.875rem",
     fontWeight: 500,
     lineHeight: "1.25rem",
-    padding: 16,
+    padding: "0 18px 0 14px",
     pointerEvents: "none",
-    textShadow: "0.5px 0.5px 1px rgba(255, 255, 255, 0.6)",
-    transition: "width 0.1s ease-in-out",
+    transition: "width 0.16s ease-in-out",
+    borderRadius: 20,
+    border: 0,
   },
 
   ".demo-workbench-search-input::placeholder": {
-    color: colors.indigo500,
+    color: "var(--dw-muted)",
     opacity: 1,
   },
 
   '.demo-workbench-search[data-focus="true"] .demo-workbench-search-input': {
-    width: 184,
-    paddingRight: 34,
+    width: 208,
     pointerEvents: "auto",
+    boxShadow: "inset 0 0 0 1px var(--dw-ring)",
+    outline: "none",
   },
-
-  '.demo-workbench-shell[data-demo-workbench-theme="dark"] .demo-workbench-search-input':
-    {
-      background: colors.indigo500,
-      boxShadow: shadows.darkInput,
-      color: colors.indigo950,
-      textShadow: "0.5px 0.5px 1px rgba(255, 255, 255, 0.2)",
-    },
-
-  '.demo-workbench-shell[data-demo-workbench-theme="dark"] .demo-workbench-search-input::placeholder':
-    {
-      color: colors.indigo700,
-    },
 
   ".demo-workbench-search-button": {
     position: "absolute",
@@ -227,53 +349,45 @@ const workbenchStyles: StyledAtomStyles = {
     width: 26,
     height: 26,
     cursor: "pointer",
-    borderRadius: 24,
-    background: colors.indigo200,
-    boxShadow: shadows.lightButton,
+    borderRadius: "50%",
     transition,
   },
 
   ".demo-workbench-search-button:hover": {
-    filter: "brightness(1.05)",
+    background: "var(--dw-surface-hover)",
+    boxShadow: "inset 0 0 0 1px var(--dw-border)",
   },
 
   ".demo-workbench-search-button:active": {
-    scale: 0.9,
+    scale: 0.92,
   },
-
-  '.demo-workbench-shell[data-demo-workbench-theme="dark"] .demo-workbench-search-button':
-    {
-      background: colors.indigo900,
-      boxShadow: shadows.darkButton,
-    },
 
   ".demo-workbench-search-icon": {
     position: "absolute",
     inset: 0,
-    filter: "drop-shadow(0.5px 0.5px 0.5px rgba(255, 255, 255, 1))",
   },
 
   ".demo-workbench-search-icon::before, .demo-workbench-search-icon::after": {
-    content: '""',
+    content: "",
     position: "absolute",
     borderRadius: 30,
     transition,
   },
 
   '.demo-workbench-search-icon[data-state="search"]::before': {
-    left: 3,
-    top: 3,
+    left: 4,
+    top: 5,
     width: 13,
     height: 13,
-    border: `2px solid ${colors.indigo400}`,
+    border: "2px solid var(--dw-muted)",
   },
 
   '.demo-workbench-search-icon[data-state="search"]::after': {
     left: 15,
-    top: 12,
+    top: 14,
     width: 3,
-    height: 10,
-    background: colors.indigo400,
+    height: 8,
+    background: "var(--dw-muted)",
     transform: "rotate(-45deg)",
   },
 
@@ -281,8 +395,8 @@ const workbenchStyles: StyledAtomStyles = {
     {
       left: "50%",
       top: 5,
-      width: 3,
-      height: 15,
+      width: 2,
+      height: 16,
       transform: "translateX(-50%) rotate(45deg)",
     },
 
@@ -290,44 +404,36 @@ const workbenchStyles: StyledAtomStyles = {
     {
       left: "50%",
       top: 5,
-      width: 3,
-      height: 15,
+      width: 2,
+      height: 16,
       transform: "translateX(-50%) rotate(-45deg)",
     },
 
   '.demo-workbench-search-icon[data-state="focus"]::before, .demo-workbench-search-icon[data-state="focus"]::after':
     {
-      background: colors.indigo400,
+      background: "var(--dw-muted)",
     },
 
   '.demo-workbench-search-icon[data-state="clear"]::before, .demo-workbench-search-icon[data-state="clear"]::after':
     {
-      background: colors.red500,
+      background: "var(--dw-danger)",
     },
 
-  '.demo-workbench-shell[data-demo-workbench-theme="dark"] .demo-workbench-search-icon':
-    {
-      filter: "drop-shadow(0.5px 0.5px 0.5px #0b1126)",
-    },
+  // — Theme (light/dark) toggle —
 
   ".demo-workbench-theme-toggle": {
     position: "absolute",
-    right: 10,
+    right: 12,
     top: "50%",
-    width: 62,
+    width: 58,
     height: 32,
     cursor: "pointer",
-    borderRadius: 24,
-    background: colors.indigo300,
-    boxShadow: shadows.lightInput,
+    borderRadius: 999,
+    background: "var(--dw-bg)",
+    boxShadow: "inset 0 0 0 1px var(--dw-border)",
     transform: "translateY(-50%)",
+    transition,
   },
-
-  '.demo-workbench-shell[data-demo-workbench-theme="dark"] .demo-workbench-theme-toggle':
-    {
-      background: colors.indigo500,
-      boxShadow: shadows.darkInput,
-    },
 
   ".demo-workbench-theme-toggle-knob": {
     position: "absolute",
@@ -336,57 +442,45 @@ const workbenchStyles: StyledAtomStyles = {
     width: 26,
     height: 26,
     cursor: "pointer",
-    borderRadius: 24,
-    background: colors.indigo200,
-    boxShadow: shadows.lightButton,
+    borderRadius: "50%",
+    background: "var(--dw-surface)",
+    boxShadow: "inset 0 0 0 1px var(--dw-border), var(--dw-shadow-sm)",
     transition,
   },
 
   '.demo-workbench-theme-toggle[data-active="true"] .demo-workbench-theme-toggle-knob':
     {
-      left: 32,
+      left: 28,
     },
 
-  ".demo-workbench-theme-toggle-knob:hover": {
-    filter: "brightness(1.05)",
+  ".demo-workbench-theme-toggle:hover .demo-workbench-theme-toggle-knob": {
+    background: "var(--dw-surface-hover)",
   },
 
-  ".demo-workbench-theme-toggle-knob:active": {
-    scale: 0.9,
+  ".demo-workbench-theme-toggle:active .demo-workbench-theme-toggle-knob": {
+    scale: 0.92,
   },
-
-  '.demo-workbench-shell[data-demo-workbench-theme="dark"] .demo-workbench-theme-toggle-knob':
-    {
-      background: colors.indigo900,
-      boxShadow: shadows.darkButton,
-    },
 
   ".demo-workbench-theme-toggle-icon": {
     position: "absolute",
-    left: 0.5,
-    top: 0.5,
+    left: 1,
+    top: 1,
     display: "flex",
     width: 24,
     height: 24,
     alignItems: "center",
     justifyContent: "center",
     border: "6px solid transparent",
-    borderRadius: 24,
-    boxShadow: shadows.sun,
-    filter: "drop-shadow(0.5px 0.5px 0.5px rgba(255, 255, 255, 1))",
-    scale: 0.9,
+    borderRadius: "50%",
+    boxShadow: "inset 0 0 0 2px var(--dw-accent)",
+    scale: 0.85,
     transition,
   },
 
   '.demo-workbench-theme-toggle[data-active="true"] .demo-workbench-theme-toggle-icon':
     {
       borderWidth: 4,
-      boxShadow: shadows.moon,
-    },
-
-  '.demo-workbench-shell[data-demo-workbench-theme="dark"] .demo-workbench-theme-toggle-icon':
-    {
-      filter: "drop-shadow(0.5px 0.5px 0.5px #0b1126)",
+      boxShadow: "inset -4px -4px 0 var(--dw-accent)",
     },
 
   ".demo-workbench-theme-toggle-line": {
@@ -396,18 +490,18 @@ const workbenchStyles: StyledAtomStyles = {
     height: 2,
     alignItems: "center",
     justifyContent: "center",
-    borderLeft: `4px solid ${colors.indigo400}`,
-    borderRight: `4px solid ${colors.indigo400}`,
+    borderLeft: "4px solid var(--dw-accent)",
+    borderRight: "4px solid var(--dw-accent)",
     transition,
-  },
-
-  ".demo-workbench-theme-toggle-line::before": {
-    content: '""',
-    width: 24,
-    height: 2,
-    borderLeft: `4px solid ${colors.indigo400}`,
-    borderRight: `4px solid ${colors.indigo400}`,
-    transform: "rotate(45deg)",
+    "&::before": {
+      content: "",
+      position: "absolute",
+      width: 24,
+      height: 2,
+      borderLeft: "4px solid var(--dw-accent)",
+      borderRight: "4px solid var(--dw-accent)",
+      transform: "rotate(45deg)",
+    },
   },
 
   ".demo-workbench-theme-toggle-line-y": {
@@ -419,10 +513,12 @@ const workbenchStyles: StyledAtomStyles = {
       opacity: 0,
     },
 
+  // — Grid / scroll —
+
   ".demo-workbench-grid-shell": {
     position: "relative",
-    width: "100%",
-    height: "calc(100vh - 112px)",
+    width: "calc(100% - 20px)",
+    height: "calc(100vh - 85px)",
     margin: "auto",
   },
 
@@ -442,61 +538,103 @@ const workbenchStyles: StyledAtomStyles = {
     },
 
   ".demo-workbench-scroll > .ms-content > .ms-bar": {
-    transform: "translateX(-40px)",
+    translate: "-2px 0px",
   },
 
-  ".demo-workbench-card, .demo-workbench-scroll-progress, .demo-workbench-not-found-card":
-    {
-      animation: "demo-workbench-ident 0.2s ease-in-out 1 forwards",
-      alignItems: "center",
-      justifyContent: "center",
-      overflow: "hidden",
-      borderRadius: 18,
-      background: colors.indigo100,
-      boxShadow: shadows.card,
-      color: colors.indigo500,
-      transition,
-    },
+  ".demo-workbench-card, .demo-workbench-scroll-progress": {
+    animation: "demo-workbench-ident 0.2s ease-in-out 1 forwards",
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+    borderRadius: 16,
+    background: "var(--dw-surface)",
+    boxShadow: "inset 0 0 0 1px var(--dw-border), var(--dw-shadow-sm)",
+    color: "var(--dw-muted)",
+    transition,
+  },
 
-  ".demo-workbench-card:hover, .demo-workbench-scroll-progress:hover, .demo-workbench-not-found-card:hover":
-    {
-      background: colors.indigo50,
-      boxShadow: shadows.cardHover,
-    },
-
-  ".demo-workbench-card:active, .demo-workbench-scroll-progress:active, .demo-workbench-not-found-card:active":
-    {
-      scale: 0.95,
-    },
-
-  '.demo-workbench-shell[data-demo-workbench-theme="dark"] .demo-workbench-card, .demo-workbench-shell[data-demo-workbench-theme="dark"] .demo-workbench-scroll-progress, .demo-workbench-shell[data-demo-workbench-theme="dark"] .demo-workbench-not-found-card':
-    {
-      background: colors.indigo900,
-      boxShadow: shadows.cardDark,
-      color: colors.indigo400,
-    },
-
-  '.demo-workbench-shell[data-demo-workbench-theme="dark"] .demo-workbench-card:hover, .demo-workbench-shell[data-demo-workbench-theme="dark"] .demo-workbench-scroll-progress:hover, .demo-workbench-shell[data-demo-workbench-theme="dark"] .demo-workbench-not-found-card:hover':
-    {
-      background: colors.indigo800,
-      boxShadow: shadows.cardDarkHover,
-    },
+  ".demo-workbench-card:hover": {
+    background: "var(--dw-surface-hover)",
+    boxShadow: "inset 0 0 0 1px var(--dw-accent), var(--dw-shadow-md)",
+  },
 
   ".demo-workbench-card": {
     position: "relative",
     display: "flex",
     width: 238,
     height: 156,
+    "&:active": {
+      transform: "scale(0.97)",
+    },
+    "&.fallback-card": {
+      pointerEvents: "none",
+      "@keyframes fallback-card-anim": {
+        "0%": {
+          transform: "rotate(5deg) translateY(0)",
+        },
+        "50%": {
+          transform: "rotate(4deg) translateY(-10px)",
+        },
+        "100%": {
+          transform: "rotate(5deg) translateY(0)",
+        },
+      },
+      "@keyframes fallback-shadow-anim": {
+        "0%": {
+          boxShadow:
+            "inset 0 0 0 1px var(--dw-border), var(--dw-shadow-sm), 0 0 0 0px rgba(255, 255, 255, 0.05)",
+        },
+        "100%": {
+          boxShadow:
+            "inset 0 0 0 1px var(--dw-border), var(--dw-shadow-sm), 0 0 0 20px rgba(255, 255, 255, 0)",
+        },
+      },
+      animation:
+        "fallback-card-anim 6s cubic-bezier(0.4, 0, 0.6, 1) 0s infinite, fallback-shadow-anim 2s cubic-bezier(0.4, 0, 0.6, 1) 0s infinite",
+      ".content": {
+        width: "100%",
+        height: "100%",
+        background: "var(--dw-surface-hover)",
+        ".emoji": {
+          position: "absolute",
+          top: "50%",
+          left: "50%",
+          transform: "translate(-50%, -50%)",
+          margin: "0",
+          fontSize: "150px",
+          "@keyframes emoji-anim1": {
+            "0%": { content: "^____^" },
+            "50%": { content: "^____^" },
+            "60%": { content: "•`____•`" },
+            "70%": { content: "´•____´•" },
+            "80%": { content: "* ____ *" },
+            "100%": { content: "^____^" },
+          },
+          "@keyframes emoji-anim2": {
+            "0%": { content: "-____-" },
+            "50%": { content: "-____-" },
+            "60%": { content: "•`____•`" },
+            "70%": { content: "´•____´•" },
+            "80%": { content: "~____~" },
+            "100%": { content: "-____-" },
+          },
+          "&::before": {
+            content: "",
+          },
+        },
+      },
+      "&.empty .emoji::before": {
+        animation: "emoji-anim1 14s cubic-bezier(0.4, 0, 0.6, 1) 0s infinite",
+      },
+      "&.not-found .emoji::before": {
+        animation: "emoji-anim2 14s cubic-bezier(0.4, 0, 0.6, 1) 0s infinite",
+      },
+    },
   },
 
   '.demo-workbench-card[data-open="true"]': {
-    boxShadow: `${shadows.card}, 0 0 0 2px ${colors.indigo500}, 0 0 0 4px ${colors.indigo100}`,
+    boxShadow: "inset 0 0 0 2px var(--dw-accent), var(--dw-shadow-sm)",
   },
-
-  '.demo-workbench-shell[data-demo-workbench-theme="dark"] .demo-workbench-card[data-open="true"]':
-    {
-      boxShadow: `${shadows.cardDark}, 0 0 0 2px ${colors.indigo500}, 0 0 0 4px ${colors.blueGray950}`,
-    },
 
   ".demo-workbench-load-fill": {
     position: "relative",
@@ -504,14 +642,9 @@ const workbenchStyles: StyledAtomStyles = {
     height: "100%",
     minHeight: 120,
     overflow: "hidden",
-    borderRadius: 16,
-    background: "rgba(224, 231, 255, 0.7)",
+    borderRadius: 12,
+    background: "var(--dw-surface-hover)",
   },
-
-  '.demo-workbench-shell[data-demo-workbench-theme="dark"] .demo-workbench-load-fill':
-    {
-      background: "rgba(15, 23, 42, 0.7)",
-    },
 
   ".demo-workbench-demo-body": {
     position: "relative",
@@ -531,11 +664,6 @@ const workbenchStyles: StyledAtomStyles = {
     overflow: "hidden",
   },
 
-  '.demo-workbench-shell[data-demo-workbench-theme="dark"] .demo-workbench-page-cell':
-    {
-      background: colors.blueGray950,
-    },
-
   ".demo-workbench-preview-frame": {
     position: "absolute",
     width: 1200,
@@ -543,26 +671,16 @@ const workbenchStyles: StyledAtomStyles = {
     overflow: "hidden",
     borderRadius: 50,
     background: "#fff",
-    boxShadow: shadows.preview,
+    boxShadow: "0 0 0 6px var(--dw-border)",
     pointerEvents: "none",
     transform: "translateY(10px) scale(0.180134)",
   },
 
-  '.demo-workbench-shell[data-demo-workbench-theme="dark"] .demo-workbench-preview-frame':
-    {
-      boxShadow: shadows.previewDark,
-    },
-
   ".demo-workbench-card-fallback": {
     width: "100%",
     height: "100%",
-    background: "rgba(224, 231, 255, 0.7)",
+    background: "var(--dw-surface-hover)",
   },
-
-  '.demo-workbench-shell[data-demo-workbench-theme="dark"] .demo-workbench-card-fallback':
-    {
-      background: "rgba(15, 23, 42, 0.7)",
-    },
 
   ".demo-workbench-card-link": {
     position: "absolute",
@@ -573,18 +691,14 @@ const workbenchStyles: StyledAtomStyles = {
     overflow: "hidden",
     padding: "0 20px",
     cursor: "pointer",
+    color: "var(--dw-text)",
     fontSize: "0.75rem",
-    fontWeight: 700,
+    fontWeight: 600,
     lineHeight: "1.75rem",
     textAlign: "center",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
   },
-
-  '.demo-workbench-shell[data-demo-workbench-theme="dark"] .demo-workbench-card-link':
-    {
-      textShadow: "0.5px 0.5px 1px rgba(0, 0, 0, 0.8)",
-    },
 
   ".demo-workbench-page-overlay": {
     position: "fixed",
@@ -603,133 +717,60 @@ const workbenchStyles: StyledAtomStyles = {
     height: 640,
     borderRadius: 50,
     background: "#fff",
-    boxShadow: shadows.preview,
+    boxShadow: "0 0 0 6px var(--dw-border), var(--dw-shadow-lg)",
     scale: 0.180134,
   },
-
-  '.demo-workbench-shell[data-demo-workbench-theme="dark"] .demo-workbench-page-overlay[data-expanded="false"]':
-    {
-      boxShadow: shadows.previewDark,
-    },
 
   ".demo-workbench-scroll-progress": {
     position: "relative",
     display: "flex",
-    width: 12,
+    width: 10,
     height: "100%",
-  },
-
-  ".demo-workbench-not-found-card": {
-    position: "absolute",
-    left: "calc(50% - 119px)",
-    top: "calc(50% - 77px)",
-    display: "flex",
-    width: 238,
-    height: 156,
-    transform: "rotate(6deg)",
-    transition: "none",
-  },
-
-  ".demo-workbench-not-found-label": {
-    position: "absolute",
-    inset: 0,
-    overflow: "hidden",
-    padding: "0 25px",
-    fontSize: "0.75rem",
-    fontWeight: 700,
-    lineHeight: "1.75rem",
-    textAlign: "center",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-  },
-
-  '.demo-workbench-shell[data-demo-workbench-theme="dark"] .demo-workbench-not-found-label':
-    {
-      textShadow: "0.5px 0.5px 1px rgba(255, 255, 255, 0.2)",
+    "&:hover": {
+      background: "var(--dw-surface-hover)",
+      boxShadow: "inset 0 0 0 1px var(--dw-border), var(--dw-shadow-md)",
     },
-
-  ".demo-workbench-empty": {
-    position: "absolute",
-    left: "50%",
-    top: "50%",
-    zIndex: 10,
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: 3,
-    borderRadius: 16,
-    background: "rgba(255, 255, 255, 0.9)",
-    boxShadow: shadows.card,
-    color: colors.zinc500,
-    padding: "28px 32px",
-    pointerEvents: "none",
-    textAlign: "center",
-    transform: "translate(-50%, -50%)",
-    backdropFilter: "blur(8px)",
-  },
-
-  '.demo-workbench-shell[data-demo-workbench-theme="dark"] .demo-workbench-empty':
-    {
-      background: "rgba(2, 6, 23, 0.8)",
-      color: colors.zinc300,
+    "&:active": {
+      margin: "-2px -1px",
+      height: "calc(100% + 4px)",
+      width: 12,
+      background: "var(--dw-surface-hover)",
+      boxShadow: "inset 0 0 0 1px var(--dw-border), var(--dw-shadow-md)",
     },
-
-  ".demo-workbench-empty-title": {
-    color: colors.indigo500,
-    fontSize: "0.875rem",
-    fontWeight: 600,
-    lineHeight: "1.25rem",
-    textTransform: "uppercase",
   },
 
-  ".demo-workbench-empty-body": {
-    color: colors.zinc800,
-    fontSize: "1.125rem",
-    fontWeight: 500,
-    lineHeight: "1.75rem",
-  },
-
-  '.demo-workbench-shell[data-demo-workbench-theme="dark"] .demo-workbench-empty-body':
-    {
-      color: colors.zinc100,
-    },
+  // — Floating buttons —
 
   ".demo-workbench-page-close, .demo-workbench-to-top": {
     position: "absolute",
-    bottom: 30,
+    bottom: 46,
     zIndex: 20,
     width: 40,
     height: 40,
     cursor: "pointer",
-    borderRadius: 24,
-    background: colors.indigo200,
-    boxShadow: shadows.floatingButton,
-    filter: "brightness(1.05)",
+    borderRadius: "50%",
+    background: "var(--dw-surface)",
+    boxShadow: "inset 0 0 0 1px var(--dw-border), var(--dw-shadow-md)",
     transition,
   },
 
   ".demo-workbench-page-close:hover, .demo-workbench-to-top:hover": {
-    filter: "brightness(1.1)",
+    background: "var(--dw-surface-hover)",
   },
 
   ".demo-workbench-page-close:active, .demo-workbench-to-top:active": {
-    scale: 0.9,
+    scale: 0.92,
   },
-
-  '.demo-workbench-shell[data-demo-workbench-theme="dark"] .demo-workbench-page-close, .demo-workbench-shell[data-demo-workbench-theme="dark"] .demo-workbench-to-top':
-    {
-      background: colors.indigo900,
-      boxShadow: shadows.darkButton,
-    },
 
   ".demo-workbench-page-close": {
     left: "50%",
     zIndex: 40,
     transform: "translateX(-50%)",
+    position: "fixed",
   },
 
   ".demo-workbench-to-top": {
-    right: 30,
+    right: 60,
     pointerEvents: "auto",
     opacity: 1,
     scale: 1,
@@ -744,19 +785,18 @@ const workbenchStyles: StyledAtomStyles = {
   ".demo-workbench-page-close-icon": {
     position: "absolute",
     inset: 0,
-    filter: "drop-shadow(0.5px 0.5px 0.5px rgba(255, 255, 255, 1))",
   },
 
   ".demo-workbench-page-close-icon::before, .demo-workbench-page-close-icon::after":
     {
-      content: '""',
+      content: "",
       position: "absolute",
       left: "50%",
       top: "50%",
       width: 3,
-      height: 24,
+      height: 22,
       borderRadius: 30,
-      background: colors.indigo400,
+      background: "var(--dw-muted)",
       transform: "translate(-50%, -50%) rotate(45deg)",
       transition,
     },
@@ -767,201 +807,39 @@ const workbenchStyles: StyledAtomStyles = {
 
   ".demo-workbench-page-close:hover .demo-workbench-page-close-icon::before, .demo-workbench-page-close:hover .demo-workbench-page-close-icon::after":
     {
-      background: colors.red500,
-    },
-
-  '.demo-workbench-shell[data-demo-workbench-theme="dark"] .demo-workbench-page-close-icon':
-    {
-      filter: "drop-shadow(0.5px 0.5px 0.5px #0b1126)",
+      background: "var(--dw-danger)",
     },
 
   ".demo-workbench-to-top-icon": {
     position: "absolute",
     left: "50%",
     top: "50%",
-    width: 26,
-    height: 26,
-    filter: "drop-shadow(0.5px 0.5px 0.5px rgba(255, 255, 255, 1))",
+    width: 24,
+    height: 24,
     transform: "translate(-50%, -50%)",
+    "&::before": {
+      left: 0,
+      transform: "rotate(-45deg)",
+    },
+    "&::after": {
+      right: 0,
+      transform: "rotate(45deg)",
+    },
   },
 
   ".demo-workbench-to-top-icon::before, .demo-workbench-to-top-icon::after": {
-    content: '""',
+    content: "",
     position: "absolute",
     top: 10,
-    width: 16,
+    width: 15,
     height: 3,
     borderRadius: 2,
-    background: colors.indigo400,
+    background: "var(--dw-muted)",
   },
 
-  ".demo-workbench-to-top-icon::before": {
-    left: 0,
-    transform: "rotate(-45deg)",
-  },
-
-  ".demo-workbench-to-top-icon::after": {
-    right: 0,
-    transform: "rotate(45deg)",
-  },
-
-  ".demo-workbench-tooltip-target": {
-    width: "100%",
-    height: "100%",
-  },
-
-  ".demo-workbench-tooltip": {
-    "--tooltip-x": "0",
-    "--tooltip-y": "0",
-    "--tooltip-margin-x": "0px",
-    "--tooltip-margin-y": "0px",
-    position: "absolute",
-    zIndex: 10,
-    display: "flex",
-    alignItems: "center",
-    borderRadius: 10,
-    background: colors.indigo100,
-    boxShadow: shadows.tooltip,
-    color: colors.indigo600,
-    filter: "drop-shadow(0 1px 3px rgba(4, 3, 52, 0.6))",
-    fontSize: "0.875rem",
-    fontWeight: 700,
-    lineHeight: "1.25rem",
-    marginLeft: "var(--tooltip-margin-x)",
-    marginTop: "var(--tooltip-margin-y)",
-    opacity: 0,
-    padding: "10px 14px",
-    pointerEvents: "none",
-    scale: 0.9,
-    textShadow: "0.5px 0.5px 1px rgba(255, 255, 255, 0.6)",
-    transition,
-    translate: "var(--tooltip-x) var(--tooltip-y)",
-  },
-
-  ".demo-workbench-tooltip::after": {
-    content: '""',
-    position: "absolute",
-    width: 0,
-    height: 0,
-    borderLeft: "8px solid transparent",
-    borderRight: "8px solid transparent",
-  },
-
-  '.demo-workbench-tooltip[data-visible="true"]': {
-    opacity: 1,
-    scale: 1,
-  },
-
-  '.demo-workbench-tooltip[data-placement="top"]': {
-    "--tooltip-y": "-100%",
-    "--tooltip-margin-y": "-10px",
-  },
-
-  '.demo-workbench-tooltip[data-placement="top"]::after': {
-    bottom: -7,
-    borderTop: `8px solid ${colors.indigo200}`,
-  },
-
-  '.demo-workbench-tooltip[data-placement="bottom"]': {
-    "--tooltip-margin-y": "10px",
-  },
-
-  '.demo-workbench-tooltip[data-placement="bottom"]::after': {
-    top: -7,
-    borderBottom: `8px solid ${colors.indigo50}`,
-  },
-
-  '.demo-workbench-tooltip[data-placement="side-left"]': {
-    "--tooltip-y": "-50%",
-    "--tooltip-margin-x": "10px",
-  },
-
-  '.demo-workbench-tooltip[data-placement="side-left"]::after': {
-    left: -11,
-    top: "50%",
-    borderTop: `8px solid ${colors.indigo50}`,
-    transform: "translateY(-50%) rotate(90deg)",
-  },
-
-  '.demo-workbench-tooltip[data-placement="side-right"]': {
-    "--tooltip-x": "-100%",
-    "--tooltip-y": "-50%",
-    "--tooltip-margin-x": "-10px",
-  },
-
-  '.demo-workbench-tooltip[data-placement="side-right"]::after': {
-    right: -11,
-    top: "50%",
-    borderBottom: `8px solid ${colors.indigo200}`,
-    transform: "translateY(-50%) rotate(90deg)",
-  },
-
-  '.demo-workbench-tooltip[data-align="center"]': {
-    "--tooltip-x": "-50%",
-  },
-
-  '.demo-workbench-tooltip[data-align="center"]::after': {
-    left: "50%",
-    transform: "translateX(-50%)",
-  },
-
-  '.demo-workbench-tooltip[data-align="left"]': {
-    "--tooltip-margin-x": "-16px",
-  },
-
-  '.demo-workbench-tooltip[data-align="left"]::after': {
-    left: 16,
-  },
-
-  '.demo-workbench-tooltip[data-align="right"]': {
-    "--tooltip-x": "-100%",
-    "--tooltip-margin-x": "16px",
-  },
-
-  '.demo-workbench-tooltip[data-align="right"]::after': {
-    right: 16,
-  },
-
-  '.demo-workbench-shell[data-demo-workbench-theme="dark"] .demo-workbench-tooltip':
+  ".demo-workbench-to-top:hover .demo-workbench-to-top-icon::before, .demo-workbench-to-top:hover .demo-workbench-to-top-icon::after":
     {
-      background: colors.indigo800,
-      boxShadow: shadows.tooltipDark,
-      color: colors.indigo400,
-      textShadow: "0.5px 0.5px 1px rgba(0, 0, 0, 0.8)",
-    },
-
-  '.demo-workbench-shell[data-demo-workbench-theme="dark"] .demo-workbench-tooltip[data-placement="top"]::after':
-    {
-      borderTopColor: colors.indigo900,
-    },
-
-  '.demo-workbench-shell[data-demo-workbench-theme="dark"] .demo-workbench-tooltip[data-placement="bottom"]::after':
-    {
-      borderBottomColor: colors.indigo600,
-    },
-
-  '.demo-workbench-shell[data-demo-workbench-theme="dark"] .demo-workbench-tooltip[data-placement="side-left"]::after':
-    {
-      borderTopColor: colors.indigo700,
-    },
-
-  '.demo-workbench-shell[data-demo-workbench-theme="dark"] .demo-workbench-tooltip[data-placement="side-right"]::after':
-    {
-      borderBottomColor: colors.indigo900,
-    },
-
-  ".demo-workbench-tooltip-icon": {
-    display: "inline-block",
-    width: 14,
-    marginRight: 6,
-    fill: colors.indigo500,
-    filter: "drop-shadow(0.5px 0.5px 0.5px rgba(255, 255, 255, 1))",
-  },
-
-  '.demo-workbench-shell[data-demo-workbench-theme="dark"] .demo-workbench-tooltip-icon':
-    {
-      fill: colors.indigo400,
-      filter: "drop-shadow(0.5px 0.5px 0.5px #0b1126)",
+      background: "var(--dw-accent)",
     },
 };
 

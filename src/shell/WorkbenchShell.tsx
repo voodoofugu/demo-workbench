@@ -8,43 +8,59 @@ import nexus from "../state/nexus";
 
 import type {
   DemoItem,
+  DemoWorkbenchAutoScale,
   DemoWorkbenchProps,
-  DemoWorkbenchViewport,
 } from "../types/public";
 
 type WorkbenchShellProps = {
   title?: string;
   demos?: DemoItem[];
-  viewport: DemoWorkbenchViewport;
+  autoScale?: DemoWorkbenchAutoScale;
   renderDemoContent?: DemoWorkbenchProps["renderDemoContent"];
   bodyBg?: DemoWorkbenchProps["bodyBg"];
   notFoundComponent?: ComponentType | undefined;
 };
 
+function getScaleForAxis(availableSize: number, referenceSize?: number | null) {
+  if (!referenceSize || referenceSize <= 0) return 0;
+  return availableSize < referenceSize
+    ? Number((availableSize / referenceSize).toFixed(4))
+    : 0;
+}
+
+function getAutoScaleOptions(autoScale?: DemoWorkbenchAutoScale) {
+  return autoScale === false ? undefined : autoScale;
+}
+
 export default memo(function WorkbenchShell({
   title,
   demos = [],
-  viewport,
+  autoScale,
   renderDemoContent,
   bodyBg,
   notFoundComponent,
 }: WorkbenchShellProps) {
   const theme = nexus.use("darkTheme") as boolean;
+  const themeColor = nexus.use("themeColor") as string;
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const autoScaleOptions = getAutoScaleOptions(autoScale);
+  const autoScaleWidth = autoScaleOptions?.width ?? null;
+  const autoScaleHeight = autoScaleOptions?.height ?? null;
 
   useEffect(() => {
-    if (!rootRef.current || typeof ResizeObserver === "undefined") return;
+    if (!autoScaleWidth && !autoScaleHeight) {
+      nexus.set({ windowScale: 0 });
+      return;
+    }
+
+    if (!rootRef.current || typeof ResizeObserver === "undefined") {
+      return;
+    }
 
     const observer = new ResizeObserver(([entry]) => {
       const { width, height } = entry.contentRect;
-      const widthScale =
-        width < viewport.width
-          ? Number((width / viewport.width).toFixed(4))
-          : 0;
-      const heightScale =
-        height < viewport.height
-          ? Number((height / viewport.height).toFixed(4))
-          : 0;
+      const widthScale = getScaleForAxis(width, autoScaleWidth);
+      const heightScale = getScaleForAxis(height, autoScaleHeight);
       const scales = [widthScale, heightScale].filter((value) => value > 0);
 
       nexus.set({
@@ -54,7 +70,7 @@ export default memo(function WorkbenchShell({
 
     observer.observe(rootRef.current);
     return () => observer.disconnect();
-  }, [viewport.height, viewport.width]);
+  }, [autoScaleHeight, autoScaleWidth]);
 
   return (
     <div
@@ -62,11 +78,12 @@ export default memo(function WorkbenchShell({
       id="templateBody"
       className="demo-workbench-shell"
       data-demo-workbench-theme={theme ? "dark" : "light"}
+      data-demo-workbench-color={themeColor}
     >
-      <WorkbenchLayout title={title} demos={demos}>
+      <WorkbenchLayout title={title}>
         <DemoGrid
           demos={demos}
-          renderDemoContent={renderDemoContent as any}
+          renderDemoContent={renderDemoContent}
           bodyBg={bodyBg}
           notFoundComponent={notFoundComponent}
         />

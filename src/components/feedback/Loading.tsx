@@ -1,4 +1,4 @@
-import { StyledAtom, type StyledAtomStyles } from "styled-atom";
+import StyledAtom, { type StyledAtomStyles } from "styled-atom";
 import type { CSSProperties } from "react";
 
 const loadingStyles: StyledAtomStyles = {
@@ -58,7 +58,7 @@ const loadingStyles: StyledAtomStyles = {
     animation: "rotateLoad 10s linear infinite",
 
     "&:before, &:after": {
-      content: '""',
+      content: "",
       position: "absolute",
       left: "50%",
       top: "50%",
@@ -89,7 +89,7 @@ const loadingStyles: StyledAtomStyles = {
       animation: "rotate-one 1s linear infinite",
 
       "&:before": {
-        content: '""',
+        content: "",
         position: "absolute",
         bottom: -3,
         left: "50%",

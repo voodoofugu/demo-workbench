@@ -1,15 +1,8 @@
 import { useLayoutEffect, useMemo } from "react";
 
-import {
-  getBrowserStorage,
-  parseStoredValue,
-  shouldRemoveStoredValue,
-  stringifyStoredValue,
-} from "../utils/storage.js";
+import { getBrowserStorage, shouldRemoveStoredValue, stringifyStoredValue } from "../utils/storage.js";
 
-const hydratedStorageKeys = new WeakMap();
-
-export default function useStorageItems(storageData = [], store, hydrateInitial = true) {
+export default function useStorageItems(storageData = [], store) {
   const entries = useMemo(
     () =>
       storageData.map((item) => ({
@@ -24,32 +17,6 @@ export default function useStorageItems(storageData = [], store, hydrateInitial 
     if (!store) return;
     const storageItems = entries.filter((item) => item.name);
     if (!storageItems.length) return;
-
-    let hydratedKeys = hydratedStorageKeys.get(store);
-    if (!hydratedKeys) {
-      hydratedKeys = new Set();
-      hydratedStorageKeys.set(store, hydratedKeys);
-    }
-
-    if (hydrateInitial && !hydratedKeys.has(entriesKey)) {
-      const restoredState = {};
-
-      storageItems.forEach((item) => {
-        const type = item.type || "session";
-        const storage = getBrowserStorage(type);
-        const value = parseStoredValue(storage?.getItem(item.name) ?? null);
-
-        if (value !== undefined) {
-          restoredState[item.name] = value;
-        }
-      });
-
-      hydratedKeys.add(entriesKey);
-
-      if (Object.keys(restoredState).length) {
-        store.set(restoredState);
-      }
-    }
 
     const writeState = (state) => {
       storageItems.forEach((item) => {
@@ -68,5 +35,5 @@ export default function useStorageItems(storageData = [], store, hydrateInitial 
     };
 
     return store.subscribe(writeState, storageItems.map((item) => item.name));
-  }, [entriesKey, store, hydrateInitial]);
+  }, [entriesKey, store]);
 }

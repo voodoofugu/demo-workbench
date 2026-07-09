@@ -1,6 +1,7 @@
 import {
   memo,
   useCallback,
+  useDeferredValue,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -13,9 +14,11 @@ import { MorphScroll } from "morphing-scroll";
 
 import DemoCell from "./DemoCell";
 import ToTopButton from "./buttons/ToTopButton";
-import { useWorkbenchStore } from "../state/WorkbenchState";
-import { normalizeDemoCssFiles } from "../utils/normalizeDemoCssFiles";
-import { matchesCssFilter } from "../utils/demoCss";
+import DemoFallback from "./DemoFallback";
+
+import nexus from "../state/nexus";
+import { getWorkbenchBg } from "../styles/workbenchStyles";
+import { warnDevelopment } from "../utils/devWarnings";
 import {
   getElementPositionData,
   getHashWorkbenchState,
@@ -26,10 +29,6 @@ import type { DemoItem } from "../types/public";
 
 type DemoGridProps = {
   demos: DemoItem[];
-  query?: string;
-  selectedCSS?: string;
-  showContent?: boolean;
-  pageClassName?: string;
   bodyBg?: string;
   renderDemoContent?: (pageName: string) => ReactNode;
   notFoundComponent?: ComponentType | undefined;
@@ -37,15 +36,22 @@ type DemoGridProps = {
 
 const DemoGrid = memo(function DemoGrid({
   demos,
-  query = "",
-  selectedCSS,
-  showContent,
-  pageClassName,
   bodyBg,
   renderDemoContent,
   notFoundComponent: NotFoundComponent,
 }: DemoGridProps) {
-  const { state, setWorkbenchState } = useWorkbenchStore();
+  const activePage = nexus.use("activePage") || "";
+  const darkTheme = Boolean(nexus.use("darkTheme"));
+  const themeColor = nexus.use("themeColor") as string;
+  const pageData = nexus.use("pageData");
+  const searchText = nexus.use("searchText").toString() || "";
+  const scrollTop = nexus.use("scrollTop");
+  const windowScale = nexus.use("windowScale");
+  // Deferred so a fast-typing user gets instant input feedback while the
+  // (virtualized, potentially heavy) grid catches up in a lower-priority render.
+  const deferredSearchText = useDeferredValue(searchText);
+  const hashState = useMemo(() => getHashWorkbenchState(), []);
+  const savedScrollTop = Number(scrollTop) || 0;
 
   const [isScrolling, setIsScrolling] = useState<boolean>(false);
   const [renderedDemoNames, setRenderedDemoNames] = useState<Set<string>>(
@@ -57,120 +63,71 @@ const DemoGrid = memo(function DemoGrid({
     left: 0,
   });
   const [pageExpanded, setPageExpanded] = useState<boolean>(false);
+  // Seeded from nexus (already restored from hash/storage before this
+  // component ever mounts) so MorphScroll's own first-render effect scrolls
+  // there instantly — no separate post-mount restore effect needed here.
   const [scrollPosition, setScrollPosition] = useState<{
     value: number;
     updater: boolean;
     duration?: number;
-  }>({
-    value: 0,
-    updater: false,
-  });
+  }>(() => ({ value: savedScrollTop, updater: false }));
 
-  const activePage = state.activePage || "";
-  const searchText = state.searchText || "";
-  const darkTheme = Boolean(state.darkTheme);
-  const savedScrollTop = Number(state.scrollTop) || 0;
   const lastStoredScrollTopRef = useRef(savedScrollTop);
-  const latestSavedScrollTopRef = useRef(savedScrollTop);
   const pendingRenderedKeysRef = useRef<string[] | null>(null);
   const scrollFrameRef = useRef<number | null>(null);
-  const restoredScrollPositionRef = useRef(false);
-  latestSavedScrollTopRef.current = savedScrollTop;
 
-  const hashState = useMemo(() => getHashWorkbenchState(), []);
-
-  const filteredDemos = useMemo(() => {
-    const lowerQuery = (query || "").trim().toLowerCase();
-
-    return demos.filter((demo) => {
-      const title = demo.title ?? demo.name ?? "";
-      const cssFiles = normalizeDemoCssFiles(demo);
-      const searchMatch =
-        !lowerQuery || title.toLowerCase().includes(lowerQuery);
-      const cssMatch = matchesCssFilter(cssFiles, selectedCSS);
-      return searchMatch && cssMatch;
-    });
-  }, [demos, query, selectedCSS]);
+  const stableDemos = demos
+    .map((demo) => demo.name ?? demo.title ?? "")
+    .join("|");
 
   const usedDemos = useMemo(() => {
-    const searchData = state.searchData;
-    const sourceDemos = filteredDemos;
+    const lowerQuery = deferredSearchText.trim().toLowerCase();
+    if (!lowerQuery) return demos;
 
-    if (!searchData) return sourceDemos;
-    if (searchData[0] === "not found") return [];
-
-    return searchData
-      .map((pageName) =>
-        sourceDemos.find((demo) => (demo.name ?? demo.title) === pageName),
-      )
-      .filter((demo): demo is DemoItem => Boolean(demo));
-  }, [filteredDemos, state.searchData]);
+    return demos.filter((demo) =>
+      (demo.title ?? demo.name ?? "").toLowerCase().includes(lowerQuery),
+    );
+  }, [stableDemos, deferredSearchText]);
 
   const activeDemo = useMemo(
     () =>
       demos.find((demo) => (demo.name ?? demo.title) === activePage) ?? null,
-    [activePage, demos],
+    [activePage, stableDemos],
   );
+
+  useEffect(() => {
+    if (!activePage || activeDemo) return;
+
+    warnDevelopment(
+      `missing-demo:${activePage}`,
+      `demo "${activePage}" was not found in the generated registry.`,
+    );
+  }, [activeDemo, activePage]);
 
   useLayoutEffect(() => {
     if (!hashState) return;
 
-    setWorkbenchState({
-      activePage: hashState.activePage,
-      pageData: {
-        scrollTop: hashState.scrollTop,
-        top: hashState.top,
-        left: hashState.left,
-      },
-      searchText: hashState.searchText,
-      scrollTop: hashState.scrollTop,
-    });
     setPagePosition({
       scrollTop: hashState.scrollTop,
       top: 0,
       left: 0,
     });
     setPageExpanded(true);
-    setScrollPosition((prev) => ({
-      ...prev,
-      value: hashState.scrollTop,
-      updater: !prev.updater,
-    }));
-  }, [hashState, setWorkbenchState]);
+  }, [hashState]);
 
   useLayoutEffect(() => {
     if (hashState || !activePage) return;
 
-    const statePageData = state.pageData;
-    if (statePageData) {
+    if (pageData) {
       setPagePosition({
-        scrollTop: Number(statePageData.scrollTop) || 0,
+        scrollTop: Number(pageData.scrollTop) || 0,
         top: 0,
         left: 0,
       });
     }
 
     setPageExpanded(true);
-  }, [activePage, hashState, state.pageData]);
-
-  useEffect(() => {
-    if (hashState || restoredScrollPositionRef.current) return;
-
-    const restoredScrollTop = latestSavedScrollTopRef.current;
-    if (!restoredScrollTop) return;
-
-    restoredScrollPositionRef.current = true;
-    const frame = window.requestAnimationFrame(() => {
-      setScrollPosition((prev) => ({
-        ...prev,
-        value: restoredScrollTop,
-        updater: !prev.updater,
-      }));
-      lastStoredScrollTopRef.current = restoredScrollTop;
-    });
-
-    return () => window.cancelAnimationFrame(frame);
-  }, [hashState, savedScrollTop]);
+  }, [activePage, hashState, pageData]);
 
   const openDemo = useCallback(
     (demoName: string, event: MouseEvent<HTMLElement>) => {
@@ -181,7 +138,7 @@ const DemoGrid = memo(function DemoGrid({
         savedScrollTop,
       );
       setPagePosition(positionData);
-      setWorkbenchState({
+      nexus.set({
         pageData: positionData,
         activePage: demoName,
       });
@@ -191,11 +148,11 @@ const DemoGrid = memo(function DemoGrid({
         setPagePosition({ scrollTop: positionData.scrollTop, top: 0, left: 0 });
       });
     },
-    [activePage, savedScrollTop, setWorkbenchState],
+    [activePage, savedScrollTop],
   );
 
   const closeDemo = useCallback(() => {
-    const statePageData = state.pageData || { top: 0, left: 0, scrollTop: 0 };
+    const statePageData = pageData || { top: 0, left: 0, scrollTop: 0 };
     setPagePosition({
       scrollTop: Number(statePageData.scrollTop) || 0,
       top: Number(statePageData.top) || 0,
@@ -204,35 +161,37 @@ const DemoGrid = memo(function DemoGrid({
     setPageExpanded(false);
 
     window.setTimeout(() => {
-      setWorkbenchState({
+      nexus.set({
         activePage: "",
         pageData: null,
       });
-      if (typeof window !== "undefined") {
-        window.location.hash = "";
+      if (window.location.hash) {
+        // Unlike `location.hash = ""`, this also removes the trailing "#".
+        window.history.replaceState(
+          null,
+          "",
+          window.location.pathname + window.location.search,
+        );
       }
     }, 200);
-  }, [setWorkbenchState, state.pageData]);
+  }, [pageData]);
 
-  const handleScrollValue = useCallback(
-    (_left: number, top: number) => {
-      const nextScrollTop = Math.round(top) || 0;
+  const handleScrollValue = useCallback((_left: number, top: number) => {
+    const nextScrollTop = Math.round(top) || 0;
+    if (nextScrollTop === lastStoredScrollTopRef.current) return;
+
+    if (scrollFrameRef.current !== null) {
+      window.cancelAnimationFrame(scrollFrameRef.current);
+    }
+
+    scrollFrameRef.current = window.requestAnimationFrame(() => {
+      scrollFrameRef.current = null;
       if (nextScrollTop === lastStoredScrollTopRef.current) return;
 
-      if (scrollFrameRef.current !== null) {
-        window.cancelAnimationFrame(scrollFrameRef.current);
-      }
-
-      scrollFrameRef.current = window.requestAnimationFrame(() => {
-        scrollFrameRef.current = null;
-        if (nextScrollTop === lastStoredScrollTopRef.current) return;
-
-        lastStoredScrollTopRef.current = nextScrollTop;
-        setWorkbenchState({ scrollTop: nextScrollTop || false });
-      });
-    },
-    [setWorkbenchState],
-  );
+      lastStoredScrollTopRef.current = nextScrollTop;
+      nexus.set({ scrollTop: nextScrollTop || false });
+    });
+  }, []);
 
   useEffect(
     () => () => {
@@ -297,26 +256,24 @@ const DemoGrid = memo(function DemoGrid({
     activeDemo && typeof document !== "undefined"
       ? createPortal(
           <div
-            className={`demo-workbench-page-overlay ${pageClassName ?? ""}`}
+            className="demo-workbench-page-overlay"
             data-expanded={pageExpanded ? "true" : "false"}
             style={{
               top: `${pagePosition.top}px`,
               left: `${pagePosition.left}px`,
-              background: pageExpanded ? bodyBg || "#fff" : bodyBg || "#fff",
+              background: bodyBg || "#fff",
             }}
           >
             <DemoCell
-              demo={
-                { ...activeDemo, windowScale: state.windowScale } as DemoItem
-              }
+              demo={activeDemo}
               mode="page"
               isOpen
-              showContent={showContent}
               onClose={closeDemo}
               onOpen={openDemo}
               onLoad={handleDemoLoad}
               isDemoLoaded
               renderDemoContent={renderDemoContent}
+              windowScale={windowScale}
             />
           </div>,
           document.querySelector("#templateBody") ?? document.body,
@@ -332,42 +289,31 @@ const DemoGrid = memo(function DemoGrid({
         gap={60}
         progressTrigger={{
           wheel: true,
-          progressElement: (
-            <div className="demo-workbench-scroll-progress" />
-          ),
+          progressElement: <div className="demo-workbench-scroll-progress" />,
         }}
-        edgeGradient={{ color: darkTheme ? "#1e1b4b" : "#c7d2fe" }}
-        wrapperAlign={["center", "start"]}
-        wrapperMargin={[30, 20, 60, 20]}
+        edgeGradient={{ color: getWorkbenchBg(darkTheme, themeColor) }}
+        wrapperAlign={[
+          "center",
+          `${usedDemos.length > 0 ? "start" : "center"}`,
+        ]}
+        wrapperMargin={[50, 20, 50, 20]}
         render={{ type: "virtual", trackVisibility: true }}
         scrollPosition={scrollPosition}
         onScrollValue={handleScrollValue}
         crossCount={3}
         isScrolling={(v) => setIsScrolling(v)}
-        scrollBarEdge={30}
+        scrollBarEdge={40}
         scrollBarOnHover
         onRenderedKeysChange={handleRenderedKeysChange}
       >
-        {components}
-      </MorphScroll>
-
-      {usedDemos.length === 0 ? (
-        NotFoundComponent ? (
-          <div className="demo-workbench-not-found-card">
-            <div className="demo-workbench-preview-frame">
-              <NotFoundComponent />
-            </div>
-            <div className="demo-workbench-not-found-label">not found</div>
-          </div>
+        {!stableDemos ? (
+          <DemoFallback className="empty" title="✦ Your Demos will be here ✦" />
+        ) : usedDemos.length > 0 ? (
+          components
         ) : (
-          <div className="demo-workbench-empty">
-            <span className="demo-workbench-empty-title">No demos</span>
-            <span className="demo-workbench-empty-body">
-              Nothing matches the current filters
-            </span>
-          </div>
-        )
-      ) : null}
+          <DemoFallback className="not-found" title="✦ Not Found ✦" />
+        )}
+      </MorphScroll>
 
       {pageOverlay}
 

@@ -3,8 +3,9 @@ export { default } from "./shell/DemoWorkbench";
 
 export type {
   DemoModule,
+  DemoWorkbenchAutoScale,
+  DemoWorkbenchAutoScaleDimension,
+  DemoWorkbenchAutoScaleOptions,
   DemoWorkbenchDemoLoader,
-  DemoWorkbenchInitialState,
   DemoWorkbenchProps,
-  DemoWorkbenchViewport,
 } from "./types/public";

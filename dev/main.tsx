@@ -2,6 +2,7 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 
 import DemoWorkbench from "../src";
+import generatedWorkbenchRegistry from "../src/state/generatedWorkbenchRegistry";
 import { AlphaExample, BetaExample } from "../examples";
 
 import alphaCss from "../examples/styles/alpha.css?raw";
@@ -33,7 +34,68 @@ const demoModules = {
     default: BetaExample,
     cssFiles: ["examples/beta.css"],
   },
+  "Alpha example2`": {
+    default: AlphaExample,
+    cssFiles: ["examples/alpha.css"],
+  },
+  "Beta example2": {
+    default: BetaExample,
+    cssFiles: ["examples/beta.css"],
+  },
+  "Alpha example3`": {
+    default: AlphaExample,
+    cssFiles: ["examples/alpha.css"],
+  },
+  "Beta example3": {
+    default: BetaExample,
+    cssFiles: ["examples/beta.css"],
+  },
+  "Alpha example4`": {
+    default: AlphaExample,
+    cssFiles: ["examples/alpha.css"],
+  },
+  "Beta example4": {
+    default: BetaExample,
+    cssFiles: ["examples/beta.css"],
+  },
+  "Alpha example5": {
+    default: AlphaExample,
+    cssFiles: ["examples/alpha.css"],
+  },
+  "Beta example6": {
+    default: BetaExample,
+    cssFiles: ["examples/beta.css"],
+  },
+  "Alpha example6`": {
+    default: AlphaExample,
+    cssFiles: ["examples/alpha.css"],
+  },
+  "Beta example7": {
+    default: BetaExample,
+    cssFiles: ["examples/beta.css"],
+  },
+  "Alpha example7`": {
+    default: AlphaExample,
+    cssFiles: ["examples/alpha.css"],
+  },
+  "Beta example8": {
+    default: BetaExample,
+    cssFiles: ["examples/beta.css"],
+  },
+  "Alpha example8`": {
+    default: AlphaExample,
+    cssFiles: ["examples/alpha.css"],
+  },
+  "Beta example9": {
+    default: BetaExample,
+    cssFiles: ["examples/beta.css"],
+  },
 };
+
+// In host projects `runWorkbenchCompile` writes demo names into the generated
+// registry; the dev sandbox registers its example demos the same way.
+// generatedWorkbenchRegistry.demos = [];
+generatedWorkbenchRegistry.demos.push(...Object.keys(demoModules));
 
 function demoLoader(name: string) {
   const demo = demoModules[name as keyof typeof demoModules];
@@ -51,8 +113,7 @@ function App() {
       title="demo-workbench dev"
       demoLoader={demoLoader}
       styleLoader={styleLoader}
-      baseCssFiles={["output"]}
-      viewport={{ width: 960, height: 540 }}
+      baseStyles={["output"]}
       renderDemoContent={(pageName) => (
         <p className="demo-workbench-dev-note">
           Opened from the local dev server: {pageName}

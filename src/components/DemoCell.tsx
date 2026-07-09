@@ -1,15 +1,15 @@
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 
 import useDynamicModule from "../hooks/useDynamicModule";
-import { useWorkbenchStore } from "../state/WorkbenchState";
+import nexus from "../state/nexus";
+import { useWorkbenchHostCssFiles } from "../state/WorkbenchHostCssFilesContext";
 import { StyledAtom } from "../styles/styledAtom";
 import { normalizeModuleCssFiles } from "../utils/demoCss";
-import { useStableStringList } from "../utils/useStableStringList";
+import { useStableStringList } from "../hooks/useStableStringList";
 import { toWorkbenchStyleClassName } from "../utils/workbenchStyleScope";
 import { getElementPositionData } from "../utils/workbenchPosition";
 import PageCloseBtn from "./buttons/PageCloseBtn";
 import Loading from "./feedback/Loading";
-import Tooltip from "./Tooltip";
 
 import type { ComponentType, MouseEvent, ReactNode } from "react";
 import type { DemoItem, DemoModule } from "../types/public";
@@ -22,7 +22,6 @@ type DemoCellProps = {
   };
   mode?: DemoCellMode;
   isOpen?: boolean;
-  showContent?: boolean;
   onOpen?: (demoName: string, event: MouseEvent<HTMLElement>) => void;
   onClose?: (demoName?: string) => void;
   onLoad?: (demoName: string) => void;
@@ -31,6 +30,7 @@ type DemoCellProps = {
   isScrolling?: boolean;
   scrollTop?: number;
   searchText?: string;
+  windowScale?: number | null;
 };
 
 const loadFill = (
@@ -62,20 +62,16 @@ function DemoBody({
   pageName,
   Component,
   mode,
-  showContent,
   renderDemoContent,
   windowScale,
 }: {
   pageName: string;
   Component?: ComponentType<{ pageName?: string; children?: ReactNode }>;
   mode: DemoCellMode;
-  showContent?: boolean;
   renderDemoContent?: (pageName: string) => ReactNode;
   windowScale?: number | null;
 }) {
   if (!Component) return loadFill;
-
-  const shouldRenderContent = mode === "page" && showContent !== false;
 
   const scaledStyle =
     mode === "page" && windowScale
@@ -88,19 +84,10 @@ function DemoBody({
       : undefined;
 
   return (
-    <div id="resize" style={scaledStyle}>
-      <div
-        id={pageName}
-        className="demo-workbench-demo-body"
-        data-mode={mode}
-      >
+    <div className="demo-workbench-demo-scale" style={scaledStyle}>
+      <div id={pageName} className="demo-workbench-demo-body" data-mode={mode}>
         <Component pageName={pageName}>
-          {shouldRenderContent ? (
-            <>
-              {renderDemoContent?.(pageName)}
-              <div className="tooltip-layer" />
-            </>
-          ) : null}
+          {mode === "page" ? renderDemoContent?.(pageName) : null}
         </Component>
       </div>
     </div>
@@ -111,7 +98,6 @@ const DemoCell = memo(function DemoCell({
   demo,
   mode = "card",
   isOpen = false,
-  showContent,
   onOpen,
   onClose,
   onLoad,
@@ -120,8 +106,11 @@ const DemoCell = memo(function DemoCell({
   isScrolling,
   scrollTop = 0,
   searchText = "",
+  windowScale,
 }: DemoCellProps) {
-  const { state } = useWorkbenchStore();
+  const activePage = nexus.use("activePage");
+  const workbenchScope = nexus.use("workbenchScope");
+  const baseCssFiles = useWorkbenchHostCssFiles();
 
   const pageName = demo.name ?? demo.title ?? "Untitled demo";
   const shouldLoadDynamicModule =
@@ -175,7 +164,9 @@ const DemoCell = memo(function DemoCell({
     [DynamicComponent, onOpen, pageName],
   );
 
-  const handleMouseUp = useCallback(
+  // Runs before the browser follows the link (middle click / cmd+click), so
+  // the href always carries the card's current position for the new tab.
+  const handleCardMouseDown = useCallback(
     (event: MouseEvent<HTMLElement>) => {
       setNewTabPosition(computePositionData(event));
     },
@@ -191,19 +182,18 @@ const DemoCell = memo(function DemoCell({
       pageName={pageName}
       Component={DynamicComponent}
       mode={mode}
-      showContent={showContent}
       renderDemoContent={renderDemoContent}
-      windowScale={(demo as { windowScale?: number | null }).windowScale}
+      windowScale={windowScale}
     />
   );
 
   const scopeClassName = useMemo(
-    () => getScopeClassName([...state.baseCssFiles, ...stableCssFiles]),
-    [state.baseCssFiles, stableCssFiles],
+    () => getScopeClassName([...baseCssFiles, ...stableCssFiles]),
+    [baseCssFiles, stableCssFiles],
   );
   const scopeAttributeName = useMemo(
-    () => getWorkbenchScopeAttributeName(state.workbenchScope),
-    [state.workbenchScope],
+    () => getWorkbenchScopeAttributeName(workbenchScope),
+    [workbenchScope],
   );
 
   const content = stableCssFiles.length ? (
@@ -234,7 +224,7 @@ const DemoCell = memo(function DemoCell({
   const cardHref = `#/&${encodeURIComponent(pageName)}/${newTabPosition.scrollTop}/${newTabPosition.top}/${newTabPosition.left}/${encodeURIComponent(searchText)}`;
 
   const shouldRenderFallback = Boolean(
-    (isScrolling && !hasLoadedObject) || state.activePage,
+    (isScrolling && !hasLoadedObject) || activePage,
   );
 
   return (
@@ -250,17 +240,15 @@ const DemoCell = memo(function DemoCell({
           content
         )}
       </div>
-      <Tooltip text={pageName} position="top">
-        <a
-          className="demo-workbench-card-link"
-          href={cardHref}
-          aria-disabled={!DynamicComponent}
-          onClick={handleOpen}
-          onMouseUp={handleMouseUp}
-        >
-          {demo.title ?? pageName}
-        </a>
-      </Tooltip>
+      <a
+        className="demo-workbench-card-link"
+        href={cardHref}
+        aria-disabled={!DynamicComponent}
+        onClick={handleOpen}
+        onMouseDown={handleCardMouseDown}
+      >
+        {demo.title ?? pageName}
+      </a>
     </div>
   );
 });
