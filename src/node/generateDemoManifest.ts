@@ -169,7 +169,8 @@ function renderDemoManifest(demos: WorkbenchDiscoveredFile[], importPathPrefix: 
   const prefix = toImportPath(importPathPrefix).replace(/\/$/, "");
   const lines = demos.map((demo) => {
     const encodedName = JSON.stringify(demo.name);
-    return `  { name: ${encodedName}, load: () => import(${JSON.stringify(`${prefix}/${demo.fileName}`)}) },`;
+    const importPath = JSON.stringify(`${prefix}/${demo.fileName}`);
+    return `  { name: ${encodedName}, load: () => import(${importPath}) },`;
   });
 
   return [

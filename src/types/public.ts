@@ -2,19 +2,55 @@ import type { ComponentType, ReactNode } from "react";
 
 /**---
  * ## ![logo](https://github.com/voodoofugu/demo-workbench/raw/main/src/assets/demo-workbench-logo.png)
+ * ### ***DemoComponentProps***:
+ * props the workbench passes to a demo's default component.
+ * @description
+ * A demo is a normal React component. The workbench renders it both as a small
+ * grid preview and as the opened full-screen view, and passes:
+ * - `pageName` — the demo's stable name (its `DemoItem.name`).
+ * - `isActive` — `true` only while the demo is opened full-screen, `false` in the
+ *   grid preview. Gate expensive work (timers, canvases, data fetching) on it so
+ *   it runs only for the opened demo, not for every card in the pool.
+ * - `children` — the host overlay produced by `renderDemoContent`, provided only
+ *   when opened. Render it wherever the demo wants the project layer.
+ * @example
+ * ```tsx
+ * export default function GuardianChestsWindow({ isActive, children }: DemoComponentProps) {
+ *   return (
+ *     <div className="screen">
+ *       {isActive ? <HeavyAnimation /> : <StaticPreview />}
+ *       {children}
+ *     </div>
+ *   );
+ * }
+ * ```
+ */
+export type DemoComponentProps = {
+  /** The demo's stable name (its `DemoItem.name`). */
+  pageName?: string;
+  /** `true` only while the demo is opened full-screen; `false` in the grid preview. */
+  isActive?: boolean;
+  /** Host overlay from `renderDemoContent`, provided only when the demo is opened. */
+  children?: ReactNode;
+};
+
+/**---
+ * ## ![logo](https://github.com/voodoofugu/demo-workbench/raw/main/src/assets/demo-workbench-logo.png)
  * ### ***DemoModule***:
  * module shape returned by a demo loader.
  * @description
- * A demo module must expose a default React component. Optional `cssFiles` are loaded through `styled-atom` before the preview is rendered.
+ * A demo module must expose a default React component. It declares its own scoped CSS by exporting `cssFiles` — compiled file names (without extension) that the workbench loads through `styled-atom` before the preview is rendered. Co-locating the list with the demo keeps a single, obvious place for a demo's styles.
  * @example
  * ```ts
- * const module: DemoModule = await import("./demos/ButtonDemo");
+ * // ButtonDemo.tsx
+ * export const cssFiles = ["button-demo"];
+ * export default function ButtonDemo() { ... }
  * ```
  */
 export type DemoModule = {
   /** Demo component rendered inside the workbench cell and opened-demo modal. */
-  default: ComponentType<{ pageName?: string; children?: ReactNode }>;
-  /** Styled-atom CSS file names used by the demo. */
+  default: ComponentType<DemoComponentProps>;
+  /** Styled-atom CSS file names the demo needs, declared via `export const cssFiles`. */
   cssFiles?: string[];
 };
 
@@ -27,11 +63,7 @@ export type DemoModule = {
  * @example
  * ```ts
  * const demos: DemoItem[] = [
- *   {
- *     name: "Button",
- *     load: () => import("./demos/ButtonDemo"),
- *     cssFiles: ["button-demo"],
- *   },
+ *   { name: "Button", load: () => import("./demos/ButtonDemo") },
  * ];
  * ```
  */
@@ -42,8 +74,6 @@ export type DemoItem = {
   title?: string;
   /** Lazy loader for the demo module. Usually `() => import("./MyDemo")`. */
   load: () => Promise<DemoModule>;
-  /** Styled-atom CSS file names loaded for this demo preview. */
-  cssFiles?: string[];
 };
 
 export type DemoWorkbenchAutoScaleDimension = number | null;
@@ -93,8 +123,6 @@ export type DemoWorkbenchProps = {
   styleLoader?: (name: string) => Promise<unknown>;
   /** Host-level styled-atom CSS files loaded by the workbench shell. */
   baseStyles?: string[];
-  /** @deprecated Use `baseStyles` instead. */
-  baseCssFiles?: string[];
   /** Reference opened-demo workspace size used to scale down previews when the browser area is smaller. Omit to disable auto scaling. */
   autoScale?: DemoWorkbenchAutoScale;
   /** Optional host content rendered as children of an opened demo component. */

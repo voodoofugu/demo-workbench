@@ -99,11 +99,9 @@ test("buttons use safe click semantics and nexus functional updates", async () =
     stateTypes,
     /WorkbenchStateUpdate[\s\S]*\(state: WorkbenchState\)/,
   );
-  assert.match(
-    toggleButton,
-    /nexus\.set\(\(prev: \{ darkTheme: boolean \}\) => \(\{[\s\S]*darkTheme: !prev\.darkTheme/,
-  );
-  assert.doesNotMatch(toggleButton, /darkTheme:\s*\([^)]*\)\s*=>/);
+  // ToggleButton's dark-theme flip is verified behaviorally in
+  // components.dom.test.tsx; here we only assert it writes through nexus.
+  assert.match(toggleButton, /nexus\.set/);
   assert.match(
     demoGrid,
     /nexus\.set\(\{[\s\S]*pageData:[\s\S]*activePage:/,
@@ -128,16 +126,10 @@ test("nexus persists through nexus-state and overlays hash navigation on hydrate
   // closing a demo opened in a new tab shrinks it back onto its card.
   assert.match(nexusState, /top: hashState\.top/);
   assert.match(nexusState, /left: hashState\.left/);
-  assert.doesNotMatch(nexusState, /baseCssFiles/);
 
   // The bespoke storage layer is gone; DemoWorkbench no longer wires it up.
   assert.doesNotMatch(demoWorkbench, /WorkbenchStorage/);
   assert.doesNotMatch(demoWorkbench, /defaultStorageData/);
-  assert.doesNotMatch(demoWorkbench, /nexus\.set/);
-  assert.match(
-    demoWorkbench,
-    /WorkbenchHostCssFilesProvider files=\{hostCssFiles\}/,
-  );
 
   // The removed storage-layer modules must not come back.
   for (const gone of [
@@ -154,19 +146,31 @@ test("nexus persists through nexus-state and overlays hash navigation on hydrate
   }
 });
 
-test("baseCssFiles reaches DemoCell via context, not the global nexus store", async () => {
-  const [demoCell, hostContext] = await Promise.all([
+test("baseStyles flows through the global nexus store, not a context provider", async () => {
+  const [nexusState, demoWorkbench, demoCell] = await Promise.all([
+    readFile(path.join(root, "src/state/nexus.ts"), "utf8"),
+    readFile(path.join(root, "src/shell/DemoWorkbench.tsx"), "utf8"),
     readFile(path.join(root, "src/components/DemoCell.tsx"), "utf8"),
+  ]);
+
+  // Host base styles live in nexus state — the bespoke context provider is gone.
+  assert.match(nexusState, /baseStyles: string\[\]/);
+  assert.match(demoWorkbench, /nexus\.set\(\{ baseStyles: hostCssFiles \}\)/);
+  // Written from an effect, never during render, to avoid a mid-render update.
+  assert.match(demoWorkbench, /useEffect\(\(\) => \{\s*nexus\.set\(\{ baseStyles: hostCssFiles \}\)/);
+  assert.match(demoCell, /nexus\.use\("baseStyles"\)/);
+  assert.match(demoCell, /\.\.\.baseStyles, \.\.\.stableCssFiles/);
+  assert.doesNotMatch(demoCell, /useWorkbenchHostCssFiles/);
+  // The old deprecated alias is fully removed.
+  assert.doesNotMatch(demoWorkbench, /baseCssFiles/);
+
+  await assert.rejects(
     readFile(
       path.join(root, "src/state/WorkbenchHostCssFilesContext.tsx"),
       "utf8",
     ),
-  ]);
-
-  assert.match(demoCell, /useWorkbenchHostCssFiles/);
-  assert.doesNotMatch(demoCell, /state\.baseCssFiles/);
-  assert.match(hostContext, /createContext<string\[\]>/);
-  assert.match(hostContext, /WorkbenchHostCssFilesProvider/);
+    { code: "ENOENT" },
+  );
 });
 
 test("DemoWorkbench keeps stable baseStyles and owns shell styles inline", async () => {
@@ -178,6 +182,7 @@ test("DemoWorkbench keeps stable baseStyles and owns shell styles inline", async
     styledAtomBridge,
     workbenchStyles,
     loading,
+    styleReloadHook,
   ] = await Promise.all([
     readFile(path.join(root, "src/types/public.ts"), "utf8"),
     readFile(path.join(root, "src/shell/DemoWorkbench.tsx"), "utf8"),
@@ -186,11 +191,12 @@ test("DemoWorkbench keeps stable baseStyles and owns shell styles inline", async
     readFile(path.join(root, "src/styles/styledAtom.ts"), "utf8"),
     readFile(path.join(root, "src/styles/workbenchStyles.ts"), "utf8"),
     readFile(path.join(root, "src/components/feedback/Loading.tsx"), "utf8"),
+    readFile(path.join(root, "src/hooks/useWorkbenchStyleReload.ts"), "utf8"),
   ]);
 
   assert.match(publicTypes, /baseStyles\?:\s*string\[\]/);
-  assert.match(publicTypes, /baseCssFiles\?:\s*string\[\]/);
-  assert.match(publicTypes, /@deprecated Use `baseStyles` instead/);
+  // Single name for host base styles — the deprecated alias is gone everywhere.
+  assert.doesNotMatch(publicTypes, /baseCssFiles/);
   assert.match(publicTypes, /cssFiles\?:\s*string\[\]/);
   assert.match(publicTypes, /demos:\s*DemoItem\[\]/);
   assert.doesNotMatch(publicTypes, /demoLoader/);
@@ -205,13 +211,15 @@ test("DemoWorkbench keeps stable baseStyles and owns shell styles inline", async
   assert.doesNotMatch(publicTypes, /baseCssVars/);
   assert.match(
     demoWorkbench,
-    /rawHostCssFiles = baseStyles \?\? baseCssFiles \?\? \["output"\]/,
+    /rawHostCssFiles = baseStyles \?\? \["output"\]/,
   );
   assert.match(
     demoWorkbench,
     /hostCssFiles = useStableStringList\(rawHostCssFiles\)/,
   );
-  assert.match(demoWorkbench, /workbenchStyleAtoms\.configure\(loadStyle\)/);
+  // Style-reload orchestration lives in its own hook now; DemoWorkbench just calls it.
+  assert.match(demoWorkbench, /useWorkbenchStyleReload\(styleLoader\)/);
+  assert.match(styleReloadHook, /workbenchStyleAtoms\.configure\(loadStyle\)/);
   assert.doesNotMatch(demoWorkbench, /layer="workbench"/);
   assert.doesNotMatch(demoWorkbench, /layer=\{baseCssLayer\}/);
   assert.doesNotMatch(demoWorkbench, /css=\{baseCss\}/);
@@ -261,23 +269,23 @@ test("DemoWorkbench keeps stable baseStyles and owns shell styles inline", async
   assert.doesNotMatch(loading, /normalizeStyledAtomStyles/);
   assert.doesNotMatch(workbenchStyles, /content:\s*'""'/);
   assert.doesNotMatch(loading, /content:\s*'""'/);
-  assert.match(demoWorkbench, /loadStyleReloadUrlFromManifest/);
-  assert.match(demoWorkbench, /DEFAULT_STYLE_RELOAD_MANIFEST_URL/);
-  assert.match(demoWorkbench, /STYLE_RELOAD_MANIFEST_POLL_MS/);
+  assert.match(styleReloadHook, /loadStyleReloadUrlFromManifest/);
+  assert.match(styleReloadHook, /DEFAULT_STYLE_RELOAD_MANIFEST_URL/);
+  assert.match(styleReloadHook, /STYLE_RELOAD_MANIFEST_POLL_MS/);
   assert.match(
-    demoWorkbench,
+    styleReloadHook,
     /new window\.EventSource\(resolvedStyleReloadUrl\)/,
   );
   assert.match(
-    demoWorkbench,
+    styleReloadHook,
     /loadStyleReplacements\(resolvedStyleReloadUrl, fileNames\)/,
   );
-  assert.match(demoWorkbench, /workbenchStyleAtoms\.replace\(styles\)/);
+  assert.match(styleReloadHook, /workbenchStyleAtoms\.replace\(styles\)/);
   assert.doesNotMatch(styledAtomBridge, /\bStyledAtomStore\b/);
   assert.doesNotMatch(styledAtomBridge, /StyledAtomStoreOptionsT/);
-  assert.match(demoWorkbench, /styleLoaderRef/);
+  assert.match(styleReloadHook, /styleLoaderRef/);
   assert.match(demoCell, /stableCssFiles = useStableStringList\(cssFiles\)/);
-  assert.match(demoCell, /\.\.\.baseCssFiles, \.\.\.stableCssFiles/);
+  assert.match(demoCell, /\.\.\.baseStyles, \.\.\.stableCssFiles/);
   assert.match(demoCell, /className:\s*scopeClassName \|\| undefined/);
   assert.match(demoCell, /toWorkbenchStyleClassName/);
   assert.match(styledAtomBridge, /createStyledAtomStore/);
@@ -319,18 +327,19 @@ test("persisted keys cover navigation and theme, and exclude derived state", asy
 });
 
 test("development warnings cover common host integration mistakes", async () => {
-  const [demoWorkbench, demoGrid, dynamicModuleHook, devWarnings] =
+  const [demoWorkbench, demoGrid, dynamicModuleHook, devWarnings, styleReloadHook] =
     await Promise.all([
     readFile(path.join(root, "src/shell/DemoWorkbench.tsx"), "utf8"),
     readFile(path.join(root, "src/components/DemoGrid.tsx"), "utf8"),
     readFile(path.join(root, "src/hooks/useDynamicModule.tsx"), "utf8"),
     readFile(path.join(root, "src/utils/devWarnings.ts"), "utf8"),
+    readFile(path.join(root, "src/hooks/useWorkbenchStyleReload.ts"), "utf8"),
   ]);
 
   assert.match(devWarnings, /NODE_ENV !== "production"/);
   assert.match(devWarnings, /shownWarnings/);
   assert.match(demoWorkbench, /warnMissingStyleLoader/);
-  assert.match(demoWorkbench, /warnFailedStyleLoad/);
+  assert.match(styleReloadHook, /warnFailedStyleLoad/);
   assert.match(demoWorkbench, /warnInvalidDemoModule/);
   assert.match(demoWorkbench, /warnFailedDemoLoad/);
   assert.match(demoGrid, /missing-demo:/);

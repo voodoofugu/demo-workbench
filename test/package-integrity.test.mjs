@@ -117,12 +117,21 @@ test("published bundles do not include an internal generated registry", async ()
   }
 });
 
-test("example pages cover multiple pages with their own css files", async () => {
+test("example pages declare their css through the loaded module", async () => {
   const examples = await import("../examples/index.js");
 
   assert.equal(examples.exampleDemoPages.length, 2);
+  // A demo's scoped CSS is read from its module (export const cssFiles),
+  // not from a manifest-level field on the DemoItem.
+  const modules = await Promise.all(
+    examples.exampleDemoPages.map((demo) => demo.load()),
+  );
+  assert.deepEqual(
+    modules.map((module) => module.cssFiles),
+    [["examples/alpha.css"], ["examples/beta.css"]],
+  );
   assert.deepEqual(
     examples.exampleDemoPages.map((demo) => demo.cssFiles),
-    [["examples/alpha.css"], ["examples/beta.css"]],
+    [undefined, undefined],
   );
 });

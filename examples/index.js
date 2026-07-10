@@ -59,7 +59,6 @@ export function BetaExample() {
 export const exampleDemoPages = [
   {
     name: "Alpha example",
-    cssFiles: ["examples/alpha.css"],
     load: async () => ({
       default: AlphaExample,
       cssFiles: ["examples/alpha.css"],
@@ -67,7 +66,6 @@ export const exampleDemoPages = [
   },
   {
     name: "Beta example",
-    cssFiles: ["examples/beta.css"],
     load: async () => ({
       default: BetaExample,
       cssFiles: ["examples/beta.css"],

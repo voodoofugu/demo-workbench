@@ -97,776 +97,781 @@ export function getWorkbenchBg(darkTheme: boolean, themeColor: string): string {
   return (darkTheme ? darkPalette : lightPalette)(theme)["--dw-bg"];
 }
 
-const transition = "all 0.15s cubic-bezier(0.4, 0, 0.2, 1)";
+// Single source of truth for the shell's transition timing. Shared with
+// DemoGrid so the opened-demo collapse animation and the JS cleanup that
+// unmounts the overlay after it stay in lockstep.
+export const WORKBENCH_TRANSITION_MS = 150;
+const transition = `all ${WORKBENCH_TRANSITION_MS}ms cubic-bezier(0.4, 0, 0.2, 1)`;
 const rootFont =
   "ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif";
 
 const workbenchStyles: StyledAtomStyles = {
-  position: "fixed",
-  inset: 0,
-  display: "block",
-  fontFamily: rootFont,
-  letterSpacing: 0,
-
-  "@keyframes demo-workbench-appear": {
-    "0%": { opacity: 0 },
-    "100%": { opacity: 1 },
-  },
-
-  "@keyframes demo-workbench-ident": {
-    "0%": { opacity: 0, scale: 0.96 },
-    "100%": { opacity: 1, scale: 1 },
-  },
-
-  "@keyframes demo-workbench-menu": {
-    "0%": { opacity: 0, transform: "translateX(-50%) translateY(-6px)" },
-    "100%": { opacity: 1, transform: "translateX(-50%) translateY(0)" },
-  },
-
-  "*, *::before, *::after": {
-    boxSizing: "border-box",
-  },
-
-  "button, input": {
-    font: "inherit",
-    letterSpacing: 0,
-  },
-
-  button: {
-    appearance: "none",
-    border: 0,
-    background: "transparent",
-    padding: 0,
-  },
-
-  a: {
-    color: "inherit",
-    textDecoration: "none",
-  },
-
-  ".demo-workbench-shell": {
-    position: "absolute",
-    inset: 0,
-    minHeight: "100%",
-    overflow: "hidden",
-    colorScheme: "light",
-    // Default palette: light grey. Overridden by the attribute blocks below.
-    ...lightNeutrals,
-    ...palettes["light-grey"],
-  },
-
-  '.demo-workbench-shell[data-demo-workbench-color="blue"]':
-    palettes["light-blue"],
-  '.demo-workbench-shell[data-demo-workbench-color="brown"]':
-    palettes["light-brown"],
-
-  '.demo-workbench-shell[data-demo-workbench-theme="dark"]': {
-    colorScheme: "dark",
-    ...darkNeutrals,
-    ...palettes["dark-grey"],
-  },
-  '.demo-workbench-shell[data-demo-workbench-theme="dark"][data-demo-workbench-color="blue"]':
-    palettes["dark-blue"],
-  '.demo-workbench-shell[data-demo-workbench-theme="dark"][data-demo-workbench-color="brown"]':
-    palettes["dark-brown"],
-
-  ".demo-workbench-layout": {
+  "@layer demo-workbench": {
     position: "fixed",
-    width: "100%",
-    height: "100%",
-    overflow: "hidden",
-    background: "var(--dw-bg)",
-  },
-
-  ".demo-workbench-header": {
-    position: "relative",
-    zIndex: 30,
-    display: "flex",
-    alignItems: "center",
-    width: "calc(100% - 20px)",
-    maxWidth: 1160,
-    height: 56,
-    margin: "10px auto",
-    borderRadius: 26,
-    background: "var(--dw-surface)",
-    padding: "0 8px",
-    boxShadow: "inset 0 0 0 1px var(--dw-border), var(--dw-shadow-sm)",
-    animation: "demo-workbench-appear 0.3s ease-in-out 0s 1 forwards",
-  },
-
-  // — Title / theme-color menu —
-
-  ".demo-workbench-title-wrap": {
-    position: "absolute",
-    left: "50%",
-    top: "50%",
-    transform: "translate(-50%, -50%)",
-    maxWidth: "calc(100% - 180px)",
-  },
-
-  ".demo-workbench-title": {
-    display: "flex",
-    alignItems: "center",
-    gap: 6,
-    maxWidth: "100%",
-    cursor: "pointer",
-    borderRadius: 8,
-    padding: "6px 12px",
-    color: "var(--dw-text)",
-    fontSize: "1.125rem",
-    fontWeight: 600,
-    lineHeight: "1.5rem",
-    transition,
-  },
-
-  ".demo-workbench-title:hover": {
-    background: "var(--dw-surface-hover)",
-  },
-
-  ".demo-workbench-title-text": {
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-  },
-
-  ".demo-workbench-title-caret": {
-    flex: "none",
-    width: 8,
-    height: 8,
-    borderRight: "2px solid var(--dw-muted)",
-    borderBottom: "2px solid var(--dw-muted)",
-    transform: "translateY(-2px) rotate(45deg)",
-    transition,
-  },
-  '.demo-workbench-title[aria-expanded="true"] .demo-workbench-title-caret': {
-    transform: "translateY(2px) rotate(-45deg) scaleY(-1)",
-  },
-
-  ".demo-workbench-theme-menu": {
-    position: "absolute",
-    left: "50%",
-    top: "calc(100% + 8px)",
-    zIndex: 60,
-    display: "flex",
-    flexDirection: "column",
-    gap: 2,
-    minWidth: 160,
-    borderRadius: 12,
-    background: "var(--dw-surface)",
-    boxShadow: "inset 0 0 0 1px var(--dw-border), var(--dw-shadow-lg)",
-    padding: 6,
-    transform: "translateX(-50%)",
-    animation: "demo-workbench-menu 0.14s ease-out 1 forwards",
-  },
-
-  ".demo-workbench-theme-option": {
-    display: "flex",
-    alignItems: "center",
-    gap: 10,
-    width: "100%",
-    cursor: "pointer",
-    borderRadius: 8,
-    padding: "8px 10px",
-    color: "var(--dw-text)",
-    fontSize: "0.875rem",
-    fontWeight: 500,
-    lineHeight: "1.25rem",
-    textAlign: "left",
-    transition,
-  },
-
-  ".demo-workbench-theme-option:hover": {
-    background: "var(--dw-surface-hover)",
-  },
-
-  '.demo-workbench-theme-option[data-active="true"]': {
-    background: "var(--dw-accent-soft)",
-  },
-
-  ".demo-workbench-theme-swatch": {
-    flex: "none",
-    width: 16,
-    height: 16,
-    borderRadius: "50%",
-    boxShadow: "inset 0 0 0 1px var(--dw-border)",
-  },
-
-  ".demo-workbench-theme-option-label": {
-    flex: 1,
-    textTransform: "capitalize",
-  },
-
-  ".demo-workbench-theme-check": {
-    flex: "none",
-    width: 14,
-    height: 8,
-    borderLeft: "2px solid var(--dw-accent)",
-    borderBottom: "2px solid var(--dw-accent)",
-    transform: "translateY(-2px) rotate(-45deg)",
-  },
-
-  // — Search —
-
-  ".demo-workbench-search": {
-    position: "absolute",
-    left: 12,
-    top: "50%",
-    width: "fit-content",
-    height: "fit-content",
-    transform: "translateY(-50%)",
-  },
-
-  ".demo-workbench-search-input": {
-    width: 32,
-    height: 32,
-    background: "var(--dw-bg)",
-    boxShadow: "inset 0 0 0 1px var(--dw-border)",
-    color: "var(--dw-text)",
-    fontSize: "0.875rem",
-    fontWeight: 500,
-    lineHeight: "1.25rem",
-    padding: "0 18px 0 14px",
-    pointerEvents: "none",
-    transition: "width 0.16s ease-in-out",
-    borderRadius: 20,
-    border: 0,
-  },
-
-  ".demo-workbench-search-input::placeholder": {
-    color: "var(--dw-muted)",
-    opacity: 1,
-  },
-
-  '.demo-workbench-search[data-focus="true"] .demo-workbench-search-input': {
-    width: 208,
-    pointerEvents: "auto",
-    boxShadow: "inset 0 0 0 1px var(--dw-ring)",
-    outline: "none",
-  },
-
-  ".demo-workbench-search-button": {
-    position: "absolute",
-    right: 3,
-    top: 3,
-    width: 26,
-    height: 26,
-    cursor: "pointer",
-    borderRadius: "50%",
-    transition,
-  },
-
-  ".demo-workbench-search-button:hover": {
-    background: "var(--dw-surface-hover)",
-    boxShadow: "inset 0 0 0 1px var(--dw-border)",
-  },
-
-  ".demo-workbench-search-button:active": {
-    scale: 0.92,
-  },
-
-  ".demo-workbench-search-icon": {
-    position: "absolute",
-    inset: 0,
-  },
-
-  ".demo-workbench-search-icon::before, .demo-workbench-search-icon::after": {
-    content: "",
-    position: "absolute",
-    borderRadius: 30,
-    transition,
-  },
-
-  '.demo-workbench-search-icon[data-state="search"]::before': {
-    left: 4,
-    top: 5,
-    width: 13,
-    height: 13,
-    border: "2px solid var(--dw-muted)",
-  },
-
-  '.demo-workbench-search-icon[data-state="search"]::after': {
-    left: 15,
-    top: 14,
-    width: 3,
-    height: 8,
-    background: "var(--dw-muted)",
-    transform: "rotate(-45deg)",
-  },
-
-  '.demo-workbench-search-icon[data-state="focus"]::before, .demo-workbench-search-icon[data-state="clear"]::before':
-    {
-      left: "50%",
-      top: 5,
-      width: 2,
-      height: 16,
-      transform: "translateX(-50%) rotate(45deg)",
-    },
-
-  '.demo-workbench-search-icon[data-state="focus"]::after, .demo-workbench-search-icon[data-state="clear"]::after':
-    {
-      left: "50%",
-      top: 5,
-      width: 2,
-      height: 16,
-      transform: "translateX(-50%) rotate(-45deg)",
-    },
-
-  '.demo-workbench-search-icon[data-state="focus"]::before, .demo-workbench-search-icon[data-state="focus"]::after':
-    {
-      background: "var(--dw-muted)",
-    },
-
-  '.demo-workbench-search-icon[data-state="clear"]::before, .demo-workbench-search-icon[data-state="clear"]::after':
-    {
-      background: "var(--dw-danger)",
-    },
-
-  // — Theme (light/dark) toggle —
-
-  ".demo-workbench-theme-toggle": {
-    position: "absolute",
-    right: 12,
-    top: "50%",
-    width: 58,
-    height: 32,
-    cursor: "pointer",
-    borderRadius: 999,
-    background: "var(--dw-bg)",
-    boxShadow: "inset 0 0 0 1px var(--dw-border)",
-    transform: "translateY(-50%)",
-    transition,
-  },
-
-  ".demo-workbench-theme-toggle-knob": {
-    position: "absolute",
-    left: 3,
-    top: 3,
-    width: 26,
-    height: 26,
-    cursor: "pointer",
-    borderRadius: "50%",
-    background: "var(--dw-surface)",
-    boxShadow: "inset 0 0 0 1px var(--dw-border), var(--dw-shadow-sm)",
-    transition,
-  },
-
-  '.demo-workbench-theme-toggle[data-active="true"] .demo-workbench-theme-toggle-knob':
-    {
-      left: 28,
-    },
-
-  ".demo-workbench-theme-toggle:hover .demo-workbench-theme-toggle-knob": {
-    background: "var(--dw-surface-hover)",
-  },
-
-  ".demo-workbench-theme-toggle:active .demo-workbench-theme-toggle-knob": {
-    scale: 0.92,
-  },
-
-  ".demo-workbench-theme-toggle-icon": {
-    position: "absolute",
-    left: 1,
-    top: 1,
-    display: "flex",
-    width: 24,
-    height: 24,
-    alignItems: "center",
-    justifyContent: "center",
-    border: "6px solid transparent",
-    borderRadius: "50%",
-    boxShadow: "inset 0 0 0 2px var(--dw-accent)",
-    scale: 0.85,
-    transition,
-  },
-
-  '.demo-workbench-theme-toggle[data-active="true"] .demo-workbench-theme-toggle-icon':
-    {
-      borderWidth: 4,
-      boxShadow: "inset -4px -4px 0 var(--dw-accent)",
-    },
-
-  ".demo-workbench-theme-toggle-line": {
-    position: "absolute",
-    display: "flex",
-    width: 24,
-    height: 2,
-    alignItems: "center",
-    justifyContent: "center",
-    borderLeft: "4px solid var(--dw-accent)",
-    borderRight: "4px solid var(--dw-accent)",
-    transition,
-    "&::before": {
-      content: "",
-      position: "absolute",
-      width: 24,
-      height: 2,
-      borderLeft: "4px solid var(--dw-accent)",
-      borderRight: "4px solid var(--dw-accent)",
-      transform: "rotate(45deg)",
-    },
-  },
-
-  ".demo-workbench-theme-toggle-line-y": {
-    transform: "rotate(90deg)",
-  },
-
-  '.demo-workbench-theme-toggle[data-active="true"] .demo-workbench-theme-toggle-line':
-    {
-      opacity: 0,
-    },
-
-  // — Grid / scroll —
-
-  ".demo-workbench-grid-shell": {
-    position: "relative",
-    width: "calc(100% - 20px)",
-    height: "calc(100vh - 85px)",
-    margin: "auto",
-  },
-
-  ".demo-workbench-scroll": {
-    position: "relative",
-    width: "100%",
-    height: "100%",
-    overflow: "hidden",
-  },
-
-  ".demo-workbench-scroll > .ms-content > .ms-element > .ms-objects-wrapper > .ms-object-box":
-    {
-      opacity: "var(--content-visibility)",
-      filter:
-        "grayscale(calc(1 - var(--content-visibility))) blur(calc((1 - var(--content-visibility)) * 2px))",
-      transition: "transform 0.2s ease-in-out",
-    },
-
-  ".demo-workbench-scroll > .ms-content > .ms-bar": {
-    translate: "-2px 0px",
-  },
-
-  ".demo-workbench-card, .demo-workbench-scroll-progress": {
-    animation: "demo-workbench-ident 0.2s ease-in-out 1 forwards",
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-    borderRadius: 16,
-    background: "var(--dw-surface)",
-    boxShadow: "inset 0 0 0 1px var(--dw-border), var(--dw-shadow-sm)",
-    color: "var(--dw-muted)",
-    transition,
-  },
-
-  ".demo-workbench-card:hover": {
-    background: "var(--dw-surface-hover)",
-    boxShadow: "inset 0 0 0 1px var(--dw-accent), var(--dw-shadow-md)",
-  },
-
-  ".demo-workbench-card": {
-    position: "relative",
-    display: "flex",
-    width: 238,
-    height: 156,
-    "&:active": {
-      transform: "scale(0.97)",
-    },
-    "&.fallback-card": {
-      cursor: "pointer",
-      ".demo-workbench-card-link": {
-        pointerEvents: "none",
-      },
-      "&:hover": {
-        // border: "1px solid var(--dw-accent)",
-        ".demo-workbench-preview-frame .content .emoji": {
-          "&::before": {
-            display: "none",
-          },
-          "&::after": {
-            content: "0 ____ 0",
-          },
-        },
-      },
-      "&:active": {
-        ".demo-workbench-preview-frame .content .emoji": {
-          "&::before": {
-            display: "none",
-          },
-          "&::after": {
-            content: "＞____＜",
-          },
-        },
-      },
-      "@keyframes fallback-card-anim": {
-        "0%": {
-          transform: "rotate(5deg) translateY(0)",
-        },
-        "50%": {
-          transform: "rotate(4deg) translateY(-12px)",
-        },
-        "100%": {
-          transform: "rotate(5deg) translateY(0)",
-        },
-      },
-      "@keyframes fallback-shadow-anim": {
-        "0%": {
-          boxShadow:
-            "inset 0 0 0 1px var(--dw-border), var(--dw-shadow-sm), 0 0 0 0px color-mix(in srgb, var(--dw-glow) 50%, transparent)",
-        },
-        "100%": {
-          boxShadow:
-            "inset 0 0 0 1px var(--dw-border), var(--dw-shadow-sm), 0 0 0 20px color-mix(in srgb, var(--dw-glow) 0%, transparent)",
-        },
-      },
-      animation:
-        "fallback-card-anim 10s cubic-bezier(0.4, 0, 0.6, 1) 0s infinite, fallback-shadow-anim 2s cubic-bezier(0.4, 0, 0.6, 1) 0s infinite",
-      ".content": {
-        width: "100%",
-        height: "100%",
-        background: "var(--dw-surface-hover)",
-        ".emoji": {
-          position: "absolute",
-          top: "50%",
-          left: "50%",
-          transform: "translate(-50%, -50%)",
-          margin: "0",
-          fontSize: "150px",
-          "@keyframes emoji-anim1": {
-            "0%": { content: "^____^" },
-            "50%": { content: "^____^" },
-            "60%": { content: "•`____•`" },
-            "70%": { content: "´•____´•" },
-            "80%": { content: "* ____ *" },
-            "100%": { content: "^____^" },
-          },
-          "@keyframes emoji-anim2": {
-            "0%": { content: "-____-" },
-            "50%": { content: "-____-" },
-            "60%": { content: "•`____•`" },
-            "70%": { content: "´•____´•" },
-            "80%": { content: "~____~" },
-            "100%": { content: "-____-" },
-          },
-          "&::before": {
-            content: "",
-          },
-        },
-      },
-      "&.empty .emoji::before": {
-        animation: "emoji-anim1 14s cubic-bezier(0.4, 0, 0.6, 1) 0s infinite",
-      },
-      "&.not-found .emoji::before": {
-        animation: "emoji-anim2 14s cubic-bezier(0.4, 0, 0.6, 1) 0s infinite",
-      },
-    },
-  },
-
-  '.demo-workbench-card[data-open="true"]': {
-    boxShadow: "inset 0 0 0 2px var(--dw-accent), var(--dw-shadow-sm)",
-  },
-
-  ".demo-workbench-load-fill": {
-    position: "relative",
-    width: "100%",
-    height: "100%",
-    minHeight: 120,
-    overflow: "hidden",
-    borderRadius: 12,
-    background: "var(--dw-surface-hover)",
-  },
-
-  ".demo-workbench-demo-body": {
-    position: "relative",
-  },
-
-  '.demo-workbench-demo-body[data-mode="card"]': {
-    height: "100%",
-  },
-
-  '.demo-workbench-demo-body[data-mode="page"]': {
-    minHeight: "100%",
-  },
-
-  ".demo-workbench-page-cell": {
-    position: "relative",
-    minHeight: "100%",
-    overflow: "hidden",
-  },
-
-  ".demo-workbench-preview-frame": {
-    position: "absolute",
-    width: 1200,
-    height: 640,
-    overflow: "hidden",
-    borderRadius: 50,
-    background: "#fff",
-    boxShadow: "0 0 0 6px var(--dw-border)",
-    pointerEvents: "none",
-    transform: "translateY(10px) scale(0.180134)",
-  },
-
-  ".demo-workbench-card-fallback": {
-    width: "100%",
-    height: "100%",
-    background: "var(--dw-surface-hover)",
-  },
-
-  ".demo-workbench-card-link": {
-    position: "absolute",
     inset: 0,
     display: "block",
-    width: "100%",
-    height: "100%",
-    overflow: "hidden",
-    padding: "0 20px",
-    cursor: "pointer",
-    color: "var(--dw-text)",
-    fontSize: "0.75rem",
-    fontWeight: 600,
-    lineHeight: "1.75rem",
-    textAlign: "center",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-  },
+    fontFamily: rootFont,
+    letterSpacing: 0,
 
-  ".demo-workbench-page-overlay": {
-    position: "fixed",
-    overflow: "hidden",
-    transition,
-  },
-
-  '.demo-workbench-page-overlay[data-expanded="true"]': {
-    width: "100%",
-    height: "100%",
-    scale: 1,
-  },
-
-  '.demo-workbench-page-overlay[data-expanded="false"]': {
-    width: 1200,
-    height: 640,
-    borderRadius: 50,
-    background: "#fff",
-    boxShadow: "0 0 0 6px var(--dw-border), var(--dw-shadow-lg)",
-    scale: 0.180134,
-  },
-
-  ".demo-workbench-scroll-progress": {
-    position: "relative",
-    display: "flex",
-    width: 10,
-    height: "100%",
-    "&:hover": {
-      background: "var(--dw-surface-hover)",
-      boxShadow: "inset 0 0 0 1px var(--dw-border), var(--dw-shadow-md)",
+    "@keyframes demo-workbench-appear": {
+      "0%": { opacity: 0 },
+      "100%": { opacity: 1 },
     },
-    "&:active": {
-      margin: "-2px -1px",
-      height: "calc(100% + 4px)",
-      width: 12,
-      background: "var(--dw-surface-hover)",
-      boxShadow: "inset 0 0 0 1px var(--dw-border), var(--dw-shadow-md)",
+
+    "@keyframes demo-workbench-ident": {
+      "0%": { opacity: 0, scale: 0.96 },
+      "100%": { opacity: 1, scale: 1 },
     },
-  },
 
-  // — Floating buttons —
+    "@keyframes demo-workbench-menu": {
+      "0%": { opacity: 0, transform: "translateX(-50%) translateY(-6px)" },
+      "100%": { opacity: 1, transform: "translateX(-50%) translateY(0)" },
+    },
 
-  ".demo-workbench-page-close, .demo-workbench-to-top": {
-    position: "absolute",
-    bottom: 46,
-    zIndex: 20,
-    width: 40,
-    height: 40,
-    cursor: "pointer",
-    borderRadius: "50%",
-    background: "var(--dw-surface)",
-    boxShadow: "inset 0 0 0 1px var(--dw-border), var(--dw-shadow-md)",
-    transition,
-  },
+    "*, *::before, *::after": {
+      boxSizing: "border-box",
+    },
 
-  ".demo-workbench-page-close:hover, .demo-workbench-to-top:hover": {
-    background: "var(--dw-surface-hover)",
-  },
+    "button, input": {
+      font: "inherit",
+      letterSpacing: 0,
+    },
 
-  ".demo-workbench-page-close:active, .demo-workbench-to-top:active": {
-    scale: 0.92,
-  },
+    button: {
+      appearance: "none",
+      border: 0,
+      background: "transparent",
+      padding: 0,
+    },
 
-  ".demo-workbench-page-close": {
-    left: "50%",
-    zIndex: 40,
-    transform: "translateX(-50%)",
-    position: "fixed",
-  },
+    a: {
+      color: "inherit",
+      textDecoration: "none",
+    },
 
-  ".demo-workbench-to-top": {
-    right: 60,
-    pointerEvents: "auto",
-    opacity: 1,
-    scale: 1,
-  },
+    ".demo-workbench-shell": {
+      position: "absolute",
+      inset: 0,
+      minHeight: "100%",
+      overflow: "hidden",
+      colorScheme: "light",
+      // Default palette: light grey. Overridden by the attribute blocks below.
+      ...lightNeutrals,
+      ...palettes["light-grey"],
+    },
 
-  '.demo-workbench-to-top[data-visible="false"]': {
-    pointerEvents: "none",
-    opacity: 0,
-    scale: 0.9,
-  },
+    '.demo-workbench-shell[data-demo-workbench-color="blue"]':
+      palettes["light-blue"],
+    '.demo-workbench-shell[data-demo-workbench-color="brown"]':
+      palettes["light-brown"],
 
-  ".demo-workbench-page-close-icon": {
-    position: "absolute",
-    inset: 0,
-  },
+    '.demo-workbench-shell[data-demo-workbench-theme="dark"]': {
+      colorScheme: "dark",
+      ...darkNeutrals,
+      ...palettes["dark-grey"],
+    },
+    '.demo-workbench-shell[data-demo-workbench-theme="dark"][data-demo-workbench-color="blue"]':
+      palettes["dark-blue"],
+    '.demo-workbench-shell[data-demo-workbench-theme="dark"][data-demo-workbench-color="brown"]':
+      palettes["dark-brown"],
 
-  ".demo-workbench-page-close-icon::before, .demo-workbench-page-close-icon::after":
-    {
-      content: "",
+    ".demo-workbench-layout": {
+      position: "fixed",
+      width: "100%",
+      height: "100%",
+      overflow: "hidden",
+      background: "var(--dw-bg)",
+    },
+
+    ".demo-workbench-header": {
+      position: "relative",
+      zIndex: 30,
+      display: "flex",
+      alignItems: "center",
+      width: "calc(100% - 20px)",
+      maxWidth: 1160,
+      height: 56,
+      margin: "10px auto",
+      borderRadius: 26,
+      background: "var(--dw-surface)",
+      padding: "0 8px",
+      boxShadow: "inset 0 0 0 1px var(--dw-border), var(--dw-shadow-sm)",
+      animation: "demo-workbench-appear 0.3s ease-in-out 0s 1 forwards",
+    },
+
+    // — Title / theme-color menu —
+
+    ".demo-workbench-title-wrap": {
       position: "absolute",
       left: "50%",
       top: "50%",
-      width: 3,
-      height: 22,
-      borderRadius: 30,
-      background: "var(--dw-muted)",
-      transform: "translate(-50%, -50%) rotate(45deg)",
+      transform: "translate(-50%, -50%)",
+      maxWidth: "calc(100% - 180px)",
+    },
+
+    ".demo-workbench-title": {
+      display: "flex",
+      alignItems: "center",
+      gap: 6,
+      maxWidth: "100%",
+      cursor: "pointer",
+      borderRadius: 8,
+      padding: "6px 12px",
+      color: "var(--dw-text)",
+      fontSize: "1.125rem",
+      fontWeight: 600,
+      lineHeight: "1.5rem",
       transition,
     },
 
-  ".demo-workbench-page-close-icon::after": {
-    transform: "translate(-50%, -50%) rotate(-45deg)",
-  },
-
-  ".demo-workbench-page-close:hover .demo-workbench-page-close-icon::before, .demo-workbench-page-close:hover .demo-workbench-page-close-icon::after":
-    {
-      background: "var(--dw-danger)",
+    ".demo-workbench-title:hover": {
+      background: "var(--dw-surface-hover)",
     },
 
-  ".demo-workbench-to-top-icon": {
-    position: "absolute",
-    left: "50%",
-    top: "50%",
-    width: 24,
-    height: 24,
-    transform: "translate(-50%, -50%)",
-    "&::before": {
-      left: 0,
+    ".demo-workbench-title-text": {
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap",
+    },
+
+    ".demo-workbench-title-caret": {
+      flex: "none",
+      width: 8,
+      height: 8,
+      borderRight: "2px solid var(--dw-muted)",
+      borderBottom: "2px solid var(--dw-muted)",
+      transform: "translateY(-2px) rotate(45deg)",
+      transition,
+    },
+    '.demo-workbench-title[aria-expanded="true"] .demo-workbench-title-caret': {
+      transform: "translateY(2px) rotate(-45deg) scaleY(-1)",
+    },
+
+    ".demo-workbench-theme-menu": {
+      position: "absolute",
+      left: "50%",
+      top: "calc(100% + 8px)",
+      zIndex: 60,
+      display: "flex",
+      flexDirection: "column",
+      gap: 2,
+      minWidth: 160,
+      borderRadius: 12,
+      background: "var(--dw-surface)",
+      boxShadow: "inset 0 0 0 1px var(--dw-border), var(--dw-shadow-lg)",
+      padding: 6,
+      transform: "translateX(-50%)",
+      animation: "demo-workbench-menu 0.14s ease-out 1 forwards",
+    },
+
+    ".demo-workbench-theme-option": {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      width: "100%",
+      cursor: "pointer",
+      borderRadius: 8,
+      padding: "8px 10px",
+      color: "var(--dw-text)",
+      fontSize: "0.875rem",
+      fontWeight: 500,
+      lineHeight: "1.25rem",
+      textAlign: "left",
+      transition,
+    },
+
+    ".demo-workbench-theme-option:hover": {
+      background: "var(--dw-surface-hover)",
+    },
+
+    '.demo-workbench-theme-option[data-active="true"]': {
+      background: "var(--dw-accent-soft)",
+    },
+
+    ".demo-workbench-theme-swatch": {
+      flex: "none",
+      width: 16,
+      height: 16,
+      borderRadius: "50%",
+      boxShadow: "inset 0 0 0 1px var(--dw-border)",
+    },
+
+    ".demo-workbench-theme-option-label": {
+      flex: 1,
+      textTransform: "capitalize",
+    },
+
+    ".demo-workbench-theme-check": {
+      flex: "none",
+      width: 14,
+      height: 8,
+      borderLeft: "2px solid var(--dw-accent)",
+      borderBottom: "2px solid var(--dw-accent)",
+      transform: "translateY(-2px) rotate(-45deg)",
+    },
+
+    // — Search —
+
+    ".demo-workbench-search": {
+      position: "absolute",
+      left: 12,
+      top: "50%",
+      width: "fit-content",
+      height: "fit-content",
+      transform: "translateY(-50%)",
+    },
+
+    ".demo-workbench-search-input": {
+      width: 32,
+      height: 32,
+      background: "var(--dw-bg)",
+      boxShadow: "inset 0 0 0 1px var(--dw-border)",
+      color: "var(--dw-text)",
+      fontSize: "0.875rem",
+      fontWeight: 500,
+      lineHeight: "1.25rem",
+      padding: "0 18px 0 14px",
+      pointerEvents: "none",
+      transition: "width 0.16s ease-in-out",
+      borderRadius: 20,
+      border: 0,
+    },
+
+    ".demo-workbench-search-input::placeholder": {
+      color: "var(--dw-muted)",
+      opacity: 1,
+    },
+
+    '.demo-workbench-search[data-focus="true"] .demo-workbench-search-input': {
+      width: 208,
+      pointerEvents: "auto",
+      boxShadow: "inset 0 0 0 1px var(--dw-ring)",
+      outline: "none",
+    },
+
+    ".demo-workbench-search-button": {
+      position: "absolute",
+      right: 3,
+      top: 3,
+      width: 26,
+      height: 26,
+      cursor: "pointer",
+      borderRadius: "50%",
+      transition,
+    },
+
+    ".demo-workbench-search-button:hover": {
+      background: "var(--dw-surface-hover)",
+      boxShadow: "inset 0 0 0 1px var(--dw-border)",
+    },
+
+    ".demo-workbench-search-button:active": {
+      scale: 0.92,
+    },
+
+    ".demo-workbench-search-icon": {
+      position: "absolute",
+      inset: 0,
+    },
+
+    ".demo-workbench-search-icon::before, .demo-workbench-search-icon::after": {
+      content: "",
+      position: "absolute",
+      borderRadius: 30,
+      transition,
+    },
+
+    '.demo-workbench-search-icon[data-state="search"]::before': {
+      left: 4,
+      top: 5,
+      width: 13,
+      height: 13,
+      border: "2px solid var(--dw-muted)",
+    },
+
+    '.demo-workbench-search-icon[data-state="search"]::after': {
+      left: 15,
+      top: 14,
+      width: 3,
+      height: 8,
+      background: "var(--dw-muted)",
       transform: "rotate(-45deg)",
     },
-    "&::after": {
-      right: 0,
-      transform: "rotate(45deg)",
-    },
-  },
 
-  ".demo-workbench-to-top-icon::before, .demo-workbench-to-top-icon::after": {
-    content: "",
-    position: "absolute",
-    top: 10,
-    width: 15,
-    height: 3,
-    borderRadius: 2,
-    background: "var(--dw-muted)",
-  },
+    '.demo-workbench-search-icon[data-state="focus"]::before, .demo-workbench-search-icon[data-state="clear"]::before':
+      {
+        left: "50%",
+        top: 5,
+        width: 2,
+        height: 16,
+        transform: "translateX(-50%) rotate(45deg)",
+      },
 
-  ".demo-workbench-to-top:hover .demo-workbench-to-top-icon::before, .demo-workbench-to-top:hover .demo-workbench-to-top-icon::after":
-    {
-      background: "var(--dw-accent)",
+    '.demo-workbench-search-icon[data-state="focus"]::after, .demo-workbench-search-icon[data-state="clear"]::after':
+      {
+        left: "50%",
+        top: 5,
+        width: 2,
+        height: 16,
+        transform: "translateX(-50%) rotate(-45deg)",
+      },
+
+    '.demo-workbench-search-icon[data-state="focus"]::before, .demo-workbench-search-icon[data-state="focus"]::after':
+      {
+        background: "var(--dw-muted)",
+      },
+
+    '.demo-workbench-search-icon[data-state="clear"]::before, .demo-workbench-search-icon[data-state="clear"]::after':
+      {
+        background: "var(--dw-danger)",
+      },
+
+    // — Theme (light/dark) toggle —
+
+    ".demo-workbench-theme-toggle": {
+      position: "absolute",
+      right: 12,
+      top: "50%",
+      width: 58,
+      height: 32,
+      cursor: "pointer",
+      borderRadius: 999,
+      background: "var(--dw-bg)",
+      boxShadow: "inset 0 0 0 1px var(--dw-border)",
+      transform: "translateY(-50%)",
+      transition,
     },
+
+    ".demo-workbench-theme-toggle-knob": {
+      position: "absolute",
+      left: 3,
+      top: 3,
+      width: 26,
+      height: 26,
+      cursor: "pointer",
+      borderRadius: "50%",
+      background: "var(--dw-surface)",
+      boxShadow: "inset 0 0 0 1px var(--dw-border), var(--dw-shadow-sm)",
+      transition,
+    },
+
+    '.demo-workbench-theme-toggle[data-active="true"] .demo-workbench-theme-toggle-knob':
+      {
+        left: 28,
+      },
+
+    ".demo-workbench-theme-toggle:hover .demo-workbench-theme-toggle-knob": {
+      background: "var(--dw-surface-hover)",
+    },
+
+    ".demo-workbench-theme-toggle:active .demo-workbench-theme-toggle-knob": {
+      scale: 0.92,
+    },
+
+    ".demo-workbench-theme-toggle-icon": {
+      position: "absolute",
+      left: 1,
+      top: 1,
+      display: "flex",
+      width: 24,
+      height: 24,
+      alignItems: "center",
+      justifyContent: "center",
+      border: "6px solid transparent",
+      borderRadius: "50%",
+      boxShadow: "inset 0 0 0 2px var(--dw-accent)",
+      scale: 0.85,
+      transition,
+    },
+
+    '.demo-workbench-theme-toggle[data-active="true"] .demo-workbench-theme-toggle-icon':
+      {
+        borderWidth: 4,
+        boxShadow: "inset -4px -4px 0 var(--dw-accent)",
+      },
+
+    ".demo-workbench-theme-toggle-line": {
+      position: "absolute",
+      display: "flex",
+      width: 24,
+      height: 2,
+      alignItems: "center",
+      justifyContent: "center",
+      borderLeft: "4px solid var(--dw-accent)",
+      borderRight: "4px solid var(--dw-accent)",
+      transition,
+      "&::before": {
+        content: "",
+        position: "absolute",
+        width: 24,
+        height: 2,
+        borderLeft: "4px solid var(--dw-accent)",
+        borderRight: "4px solid var(--dw-accent)",
+        transform: "rotate(45deg)",
+      },
+    },
+
+    ".demo-workbench-theme-toggle-line-y": {
+      transform: "rotate(90deg)",
+    },
+
+    '.demo-workbench-theme-toggle[data-active="true"] .demo-workbench-theme-toggle-line':
+      {
+        opacity: 0,
+      },
+
+    // — Grid / scroll —
+
+    ".demo-workbench-grid-shell": {
+      position: "relative",
+      width: "calc(100% - 20px)",
+      height: "calc(100vh - 85px)",
+      margin: "auto",
+    },
+
+    ".demo-workbench-scroll": {
+      position: "relative",
+      width: "100%",
+      height: "100%",
+      overflow: "hidden",
+    },
+
+    ".demo-workbench-scroll > .ms-content > .ms-element > .ms-objects-wrapper > .ms-object-box":
+      {
+        opacity: "var(--content-visibility)",
+        filter:
+          "grayscale(calc(1 - var(--content-visibility))) blur(calc((1 - var(--content-visibility)) * 2px))",
+        transition: "transform 0.2s ease-in-out",
+      },
+
+    ".demo-workbench-scroll > .ms-content > .ms-bar": {
+      translate: "-2px 0px",
+    },
+
+    ".demo-workbench-card, .demo-workbench-scroll-progress": {
+      animation: "demo-workbench-ident 0.2s ease-in-out 1 forwards",
+      alignItems: "center",
+      justifyContent: "center",
+      overflow: "hidden",
+      borderRadius: 16,
+      background: "var(--dw-surface)",
+      boxShadow: "inset 0 0 0 1px var(--dw-border), var(--dw-shadow-sm)",
+      color: "var(--dw-muted)",
+      transition,
+    },
+
+    ".demo-workbench-card:hover": {
+      background: "var(--dw-surface-hover)",
+      boxShadow: "inset 0 0 0 1px var(--dw-accent), var(--dw-shadow-md)",
+    },
+
+    ".demo-workbench-card": {
+      position: "relative",
+      display: "flex",
+      width: 238,
+      height: 156,
+      "&:active": {
+        transform: "scale(0.97)",
+      },
+      "&.fallback-card": {
+        cursor: "pointer",
+        ".demo-workbench-card-link": {
+          pointerEvents: "none",
+        },
+        "&:hover": {
+          ".demo-workbench-preview-frame .content .emoji": {
+            "&::before": {
+              display: "none",
+            },
+            "&::after": {
+              content: "0 ____ 0",
+            },
+          },
+        },
+        "&:active": {
+          ".demo-workbench-preview-frame .content .emoji": {
+            "&::before": {
+              display: "none",
+            },
+            "&::after": {
+              content: "＞____＜",
+            },
+          },
+        },
+        "@keyframes fallback-card-anim": {
+          "0%": {
+            transform: "rotate(5deg) translateY(0)",
+          },
+          "50%": {
+            transform: "rotate(4deg) translateY(-12px)",
+          },
+          "100%": {
+            transform: "rotate(5deg) translateY(0)",
+          },
+        },
+        "@keyframes fallback-shadow-anim": {
+          "0%": {
+            boxShadow:
+              "inset 0 0 0 1px var(--dw-border), var(--dw-shadow-sm), 0 0 0 0px color-mix(in srgb, var(--dw-glow) 50%, transparent)",
+          },
+          "100%": {
+            boxShadow:
+              "inset 0 0 0 1px var(--dw-border), var(--dw-shadow-sm), 0 0 0 20px color-mix(in srgb, var(--dw-glow) 0%, transparent)",
+          },
+        },
+        animation:
+          "fallback-card-anim 10s cubic-bezier(0.4, 0, 0.6, 1) 0s infinite, fallback-shadow-anim 2s cubic-bezier(0.4, 0, 0.6, 1) 0s infinite",
+        ".content": {
+          width: "100%",
+          height: "100%",
+          background: "var(--dw-surface-hover)",
+          ".emoji": {
+            position: "absolute",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            margin: "0",
+            fontSize: "150px",
+            "@keyframes emoji-anim1": {
+              "0%": { content: "^____^" },
+              "50%": { content: "^____^" },
+              "60%": { content: "•`____•`" },
+              "70%": { content: "´•____´•" },
+              "80%": { content: "* ____ *" },
+              "100%": { content: "^____^" },
+            },
+            "@keyframes emoji-anim2": {
+              "0%": { content: "- ____ -" },
+              "50%": { content: "- ____ -" },
+              "60%": { content: "•`____•`" },
+              "70%": { content: "´•____´•" },
+              "80%": { content: "~ ____ ~" },
+              "100%": { content: "- ____ -" },
+            },
+            "&::before": {
+              content: "",
+            },
+          },
+        },
+        "&.empty .emoji::before": {
+          animation: "emoji-anim1 14s cubic-bezier(0.4, 0, 0.6, 1) 0s infinite",
+        },
+        "&.not-found .emoji::before": {
+          animation: "emoji-anim2 14s cubic-bezier(0.4, 0, 0.6, 1) 0s infinite",
+        },
+      },
+    },
+
+    '.demo-workbench-card[data-open="true"]': {
+      boxShadow: "inset 0 0 0 2px var(--dw-accent), var(--dw-shadow-sm)",
+    },
+
+    ".demo-workbench-load-fill": {
+      position: "relative",
+      width: "100%",
+      height: "100%",
+      minHeight: 120,
+      overflow: "hidden",
+      borderRadius: 12,
+      background: "var(--dw-surface-hover)",
+    },
+
+    ".demo-workbench-demo-body": {
+      position: "relative",
+    },
+
+    '.demo-workbench-demo-body[data-mode="card"]': {
+      height: "100%",
+    },
+
+    '.demo-workbench-demo-body[data-mode="page"]': {
+      minHeight: "100%",
+    },
+
+    ".demo-workbench-page-cell": {
+      position: "relative",
+      minHeight: "100%",
+      overflow: "hidden",
+    },
+
+    ".demo-workbench-preview-frame": {
+      position: "absolute",
+      width: 1200,
+      height: 640,
+      overflow: "hidden",
+      borderRadius: 50,
+      background: "#fff",
+      boxShadow: "0 0 0 6px var(--dw-border)",
+      pointerEvents: "none",
+      transform: "translateY(10px) scale(0.180134)",
+    },
+
+    ".demo-workbench-card-fallback": {
+      width: "100%",
+      height: "100%",
+      background: "var(--dw-surface-hover)",
+    },
+
+    ".demo-workbench-card-link": {
+      position: "absolute",
+      inset: 0,
+      display: "block",
+      width: "100%",
+      height: "100%",
+      overflow: "hidden",
+      padding: "0 20px",
+      cursor: "pointer",
+      color: "var(--dw-text)",
+      fontSize: "0.75rem",
+      fontWeight: 600,
+      lineHeight: "1.75rem",
+      textAlign: "center",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap",
+    },
+
+    ".demo-workbench-page-overlay": {
+      position: "fixed",
+      overflow: "hidden",
+      transition,
+    },
+
+    '.demo-workbench-page-overlay[data-expanded="true"]': {
+      width: "100%",
+      height: "100%",
+      scale: 1,
+    },
+
+    '.demo-workbench-page-overlay[data-expanded="false"]': {
+      width: 1200,
+      height: 640,
+      borderRadius: 50,
+      background: "#fff",
+      boxShadow: "0 0 0 6px var(--dw-border), var(--dw-shadow-lg)",
+      scale: 0.180134,
+    },
+
+    ".demo-workbench-scroll-progress": {
+      position: "relative",
+      display: "flex",
+      width: 10,
+      height: "100%",
+      "&:hover": {
+        background: "var(--dw-surface-hover)",
+        boxShadow: "inset 0 0 0 1px var(--dw-border), var(--dw-shadow-md)",
+      },
+      "&:active": {
+        margin: "-2px -1px",
+        height: "calc(100% + 4px)",
+        width: 12,
+        background: "var(--dw-surface-hover)",
+        boxShadow: "inset 0 0 0 1px var(--dw-border), var(--dw-shadow-md)",
+      },
+    },
+
+    // — Floating buttons —
+
+    ".demo-workbench-page-close, .demo-workbench-to-top": {
+      position: "absolute",
+      bottom: 46,
+      zIndex: 20,
+      width: 40,
+      height: 40,
+      cursor: "pointer",
+      borderRadius: "50%",
+      background: "var(--dw-surface)",
+      boxShadow: "inset 0 0 0 1px var(--dw-border), var(--dw-shadow-md)",
+      transition,
+    },
+
+    ".demo-workbench-page-close:hover, .demo-workbench-to-top:hover": {
+      background: "var(--dw-surface-hover)",
+    },
+
+    ".demo-workbench-page-close:active, .demo-workbench-to-top:active": {
+      scale: 0.92,
+    },
+
+    ".demo-workbench-page-close": {
+      left: "50%",
+      zIndex: 40,
+      transform: "translateX(-50%)",
+      position: "fixed",
+    },
+
+    ".demo-workbench-to-top": {
+      right: 60,
+      pointerEvents: "auto",
+      opacity: 1,
+      scale: 1,
+    },
+
+    '.demo-workbench-to-top[data-visible="false"]': {
+      pointerEvents: "none",
+      opacity: 0,
+      scale: 0.9,
+    },
+
+    ".demo-workbench-page-close-icon": {
+      position: "absolute",
+      inset: 0,
+    },
+
+    ".demo-workbench-page-close-icon::before, .demo-workbench-page-close-icon::after":
+      {
+        content: "",
+        position: "absolute",
+        left: "50%",
+        top: "50%",
+        width: 3,
+        height: 22,
+        borderRadius: 30,
+        background: "var(--dw-muted)",
+        transform: "translate(-50%, -50%) rotate(45deg)",
+        transition,
+      },
+
+    ".demo-workbench-page-close-icon::after": {
+      transform: "translate(-50%, -50%) rotate(-45deg)",
+    },
+
+    ".demo-workbench-page-close:hover .demo-workbench-page-close-icon::before, .demo-workbench-page-close:hover .demo-workbench-page-close-icon::after":
+      {
+        background: "var(--dw-danger)",
+      },
+
+    ".demo-workbench-to-top-icon": {
+      position: "absolute",
+      left: "50%",
+      top: "50%",
+      width: 24,
+      height: 24,
+      transform: "translate(-50%, -50%)",
+      "&::before": {
+        left: 0,
+        transform: "rotate(-45deg)",
+      },
+      "&::after": {
+        right: 0,
+        transform: "rotate(45deg)",
+      },
+    },
+
+    ".demo-workbench-to-top-icon::before, .demo-workbench-to-top-icon::after": {
+      content: "",
+      position: "absolute",
+      top: 10,
+      width: 15,
+      height: 3,
+      borderRadius: 2,
+      background: "var(--dw-muted)",
+    },
+
+    ".demo-workbench-to-top:hover .demo-workbench-to-top-icon::before, .demo-workbench-to-top:hover .demo-workbench-to-top-icon::after":
+      {
+        background: "var(--dw-accent)",
+      },
+  },
 };
 
 export default workbenchStyles;

@@ -24,8 +24,9 @@ export type WorkbenchState = {
   pageData: WorkbenchPageData;
   searchText: string;
   scrollTop: number | false;
-  windowScale: number | null;
+  windowScale: number;
   workbenchScope: string;
+  baseStyles: string[];
 };
 
 export type WorkbenchStateUpdate =
@@ -54,8 +55,9 @@ const nexus = createReactNexus<WorkbenchState>({
     pageData: null,
     searchText: "",
     scrollTop: 0,
-    windowScale: null,
+    windowScale: 0,
     workbenchScope: "[workbench-scope]",
+    baseStyles: [],
   },
 });
 

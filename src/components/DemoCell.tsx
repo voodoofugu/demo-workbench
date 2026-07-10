@@ -2,7 +2,6 @@ import { memo, useCallback, useEffect, useMemo, useState } from "react";
 
 import useDynamicModule from "../hooks/useDynamicModule";
 import nexus from "../state/nexus";
-import { useWorkbenchHostCssFiles } from "../state/WorkbenchHostCssFilesContext";
 import { StyledAtom } from "../styles/styledAtom";
 import { normalizeModuleCssFiles } from "../utils/demoCss";
 import { useStableStringList } from "../hooks/useStableStringList";
@@ -12,13 +11,13 @@ import PageCloseBtn from "./buttons/PageCloseBtn";
 import Loading from "./feedback/Loading";
 
 import type { ComponentType, MouseEvent, ReactNode } from "react";
-import type { DemoItem, DemoModule } from "../types/public";
+import type { DemoComponentProps, DemoItem, DemoModule } from "../types/public";
 
 type DemoCellMode = "card" | "page";
 
 type DemoCellProps = {
   demo: DemoItem & {
-    Component?: ComponentType<{ pageName?: string; children?: ReactNode }>;
+    Component?: ComponentType<DemoComponentProps>;
   };
   mode?: DemoCellMode;
   isOpen?: boolean;
@@ -30,7 +29,7 @@ type DemoCellProps = {
   isScrolling?: boolean;
   scrollTop?: number;
   searchText?: string;
-  windowScale?: number | null;
+  windowScale?: number;
 };
 
 const loadFill = (
@@ -66,10 +65,10 @@ function DemoBody({
   windowScale,
 }: {
   pageName: string;
-  Component?: ComponentType<{ pageName?: string; children?: ReactNode }>;
+  Component?: ComponentType<DemoComponentProps>;
   mode: DemoCellMode;
   renderDemoContent?: (pageName: string) => ReactNode;
-  windowScale?: number | null;
+  windowScale?: number;
 }) {
   if (!Component) return loadFill;
 
@@ -86,7 +85,7 @@ function DemoBody({
   return (
     <div className="demo-workbench-demo-scale" style={scaledStyle}>
       <div id={pageName} className="demo-workbench-demo-body" data-mode={mode}>
-        <Component pageName={pageName}>
+        <Component pageName={pageName} isActive={mode === "page"}>
           {mode === "page" ? renderDemoContent?.(pageName) : null}
         </Component>
       </div>
@@ -110,7 +109,7 @@ const DemoCell = memo(function DemoCell({
 }: DemoCellProps) {
   const activePage = nexus.use("activePage");
   const workbenchScope = nexus.use("workbenchScope");
-  const baseCssFiles = useWorkbenchHostCssFiles();
+  const baseStyles = nexus.use("baseStyles");
 
   const pageName = demo.name ?? demo.title ?? "Untitled demo";
   const shouldLoadDynamicModule =
@@ -121,8 +120,8 @@ const DemoCell = memo(function DemoCell({
   const DynamicComponent = demo.Component ?? loadedModule?.default;
 
   const cssFiles = useMemo(
-    () => normalizeModuleCssFiles(demo, loadedModule),
-    [demo, loadedModule],
+    () => normalizeModuleCssFiles(loadedModule),
+    [loadedModule],
   );
 
   const stableCssFiles = useStableStringList(cssFiles);
@@ -188,8 +187,8 @@ const DemoCell = memo(function DemoCell({
   );
 
   const scopeClassName = useMemo(
-    () => getScopeClassName([...baseCssFiles, ...stableCssFiles]),
-    [baseCssFiles, stableCssFiles],
+    () => getScopeClassName([...baseStyles, ...stableCssFiles]),
+    [baseStyles, stableCssFiles],
   );
   const scopeAttributeName = useMemo(
     () => getWorkbenchScopeAttributeName(workbenchScope),

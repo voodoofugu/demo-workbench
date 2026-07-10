@@ -17,7 +17,7 @@ import ToTopButton from "./buttons/ToTopButton";
 import DemoFallback from "./DemoFallback";
 
 import nexus from "../state/nexus";
-import { getWorkbenchBg } from "../styles/workbenchStyles";
+import { getWorkbenchBg, WORKBENCH_TRANSITION_MS } from "../styles/workbenchStyles";
 import { warnDevelopment } from "../utils/devWarnings";
 import {
   getElementPositionData,
@@ -42,7 +42,7 @@ const DemoGrid = memo(function DemoGrid({
   const darkTheme = Boolean(nexus.use("darkTheme"));
   const themeColor = nexus.use("themeColor") as string;
   const pageData = nexus.use("pageData");
-  const searchText = nexus.use("searchText").toString() || "";
+  const searchText = nexus.use("searchText") || "";
   const scrollTop = nexus.use("scrollTop");
   const windowScale = nexus.use("windowScale");
   // Deferred so a fast-typing user gets instant input feedback while the
@@ -158,6 +158,8 @@ const DemoGrid = memo(function DemoGrid({
     });
     setPageExpanded(false);
 
+    // Clear state (which unmounts the overlay) only after the collapse
+    // transition has finished, so the animation isn't cut short.
     window.setTimeout(() => {
       nexus.set({
         activePage: "",
@@ -171,7 +173,7 @@ const DemoGrid = memo(function DemoGrid({
           window.location.pathname + window.location.search,
         );
       }
-    }, 200);
+    }, WORKBENCH_TRANSITION_MS);
   }, [pageData]);
 
   const handleScrollValue = useCallback((_left: number, top: number) => {
@@ -290,10 +292,7 @@ const DemoGrid = memo(function DemoGrid({
           progressElement: <div className="demo-workbench-scroll-progress" />,
         }}
         edgeGradient={{ color: getWorkbenchBg(darkTheme, themeColor) }}
-        wrapperAlign={[
-          "center",
-          `${usedDemos.length > 0 ? "start" : "center"}`,
-        ]}
+        wrapperAlign={["center", usedDemos.length > 0 ? "start" : "center"]}
         wrapperMargin={[50, 20, 50, 20]}
         render={{ type: "virtual", trackVisibility: true }}
         scrollPosition={scrollPosition}

@@ -6,6 +6,7 @@
 
 - [About](#about)
 - [Installation](#installation)
+- [Quick start](#quick-start)
 - [API](#api)
 - [License](#license)
 
@@ -52,6 +53,82 @@ Workbench shell styles are injected by the package automatically when `DemoWorkb
 
 <h2></h2>
 
+### Quick start
+
+**1. Write a compile script.** It generates the demo manifest and compiles your project CSS into scoped, workbench-ready files:
+
+```ts
+// scripts/workbenchCompile.ts
+import { runWorkbenchCompile } from "demo-workbench/node";
+
+runWorkbenchCompile({
+  styles: { inputDir: "src/styles/scss", outputDir: "src/styles/workbench-css" },
+  demos: { inputDir: "src/screens", outputFile: "src/screens/demos" },
+});
+```
+
+Run it once with `ts-node scripts/workbenchCompile.ts`, or add `--watch` during development. Serve `styles.outputDir` at `/workbench-css/` so the shell can load the compiled CSS (and hot-reload it in watch mode).
+
+**2. Render the shell** with the generated manifest and a `styleLoader`:
+
+```tsx
+import DemoWorkbench from "demo-workbench";
+import demos from "./screens/demos.js";
+
+export default function App() {
+  return (
+    <DemoWorkbench
+      title="My Project Demos"
+      demos={demos}
+      styleLoader={(name) => import(`./styles/workbench-css/${name}.css`)}
+      baseStyles={["reset", "ui-elements", "keyframes-animations"]}
+    />
+  );
+}
+```
+
+That's it: the package owns the shell (grid, search, theme, opened-demo modal, persisted state), while your project owns the screens and their styles.
+
+<h4 id="demo-css"></h4>
+
+> **✦ Demo CSS**
+>
+> A preview loads only the scoped CSS you point it at, and a demo declares that itself by exporting `cssFiles` — compiled file names (without extension) from `styles.outputDir` — right next to the component:
+>
+> ```tsx
+> // src/screens/GuardianChestsWindow.tsx
+> export const cssFiles = ["guardian-chests-window", "screen-superhero"];
+>
+> export default function GuardianChestsWindow() {
+>   return /* ... */;
+> }
+> ```
+>
+> The list lives with the demo, so there is one obvious place for a screen's styles. Shell-wide styles that apply to every preview (reset, tokens, keyframes) go through the `baseStyles` prop instead. Omit `cssFiles` if a demo needs no scoped CSS.
+
+<h4 id="demo-component"></h4>
+
+> **✦ Demo component props**
+>
+> A demo's default export is a normal React component. The workbench renders it both as a small grid preview and as the opened full-screen view, and passes these optional props (typed as `DemoComponentProps`):
+>
+> - `pageName?: string` — the demo's stable name (its `DemoItem.name`).
+> - `isActive?: boolean` — `true` only while the demo is opened full-screen, `false` in the grid preview. Gate expensive work (timers, canvases, data fetching) on it so it runs for the opened demo, not for every card in the pool.
+> - `children?: ReactNode` — the host overlay from `renderDemoContent`, provided only when opened. Render it wherever the demo wants the project layer.
+>
+> ```tsx
+> export default function GuardianChestsWindow({ isActive, children }) {
+>   return (
+>     <div className="screen">
+>       {isActive ? <HeavyAnimation /> : <StaticPreview />}
+>       {children}
+>     </div>
+>   );
+> }
+> ```
+
+<h2></h2>
+
 ### API
 
 <ul><div>
@@ -95,7 +172,6 @@ function DemoWorkbench(props: DemoWorkbenchProps): JSX.Element;
 - `demos: DemoItem[]` - generated host-owned demo manifest.
 - `styleLoader?: (name: string) => Promise<unknown>` - dynamic style loader used by `styled-atom`.
 - `baseStyles?: string[]` - host-level CSS atoms loaded by the shell.
-- `baseCssFiles?: string[]` - deprecated alias for `baseStyles`.
 - `autoScale?: false | { width?: number | null; height?: number | null }` - optional opened-demo auto scale reference. Omit it to keep workbench auto scaling disabled.
 - `renderDemoContent?: (pageName: string) => ReactNode` - project layer rendered inside opened demos.
 - `bodyBg?: string` - background value for the opened demo body.
@@ -144,6 +220,8 @@ runWorkbenchCompile({
 ```tsx
 import demos from "./myDemos.js";
 ```
+
+The generated manifest holds `{ name, load }` entries only; each demo declares its own scoped CSS via `export const cssFiles` (see [Demo CSS](#demo-css)).
 
 Full style compiles clean `styles.outputDir` by default so removed source styles do not leave stale CSS behind. Pass `clean: false` only when that output directory intentionally contains files managed outside `demo-workbench`.
 
@@ -202,40 +280,6 @@ This is the main Node entry point for host projects. It reads <code>process.argv
 function runWorkbenchCompile(
   options: WorkbenchCompileCommandOptions,
 ): Promise<WorkbenchCompileResult | WorkbenchCompileWatchResult | undefined>;
-```
-
-</div></ul></details>
-
-<h2></h2>
-
-###### **— PATTERNS —**
-
-<details><summary><b>Opened-demo auto scale</b></summary><br /><ul><div>
-
-```tsx
-// Default behavior: no workbench auto scale.
-<DemoWorkbench demos={demos} />
-
-// Fixed game/screen workspace.
-<DemoWorkbench demos={demos} autoScale={{ width: 1200, height: 640 }} />
-
-// Scale by width only; the demo owns its height responsiveness.
-<DemoWorkbench demos={demos} autoScale={{ width: 1200, height: null }} />
-
-// Explicit no-op, useful when autoScale is toggled from config.
-<DemoWorkbench demos={demos} autoScale={false} />
-```
-
-</div></ul></details>
-
-<details><summary><b>Style compiler logs</b></summary><br /><ul><div>
-
-```ts
-// Default: compact CLI progress plus Sass/CSS compiler output.
-runWorkbenchCompile({ styles, demos });
-
-// Keep CLI progress, hide Sass/CSS compiler warnings.
-runWorkbenchCompile({ styles, demos, styleLogs: false });
 ```
 
 </div></ul></details>
