@@ -41,7 +41,7 @@ Workbench shell styles are injected by the package automatically when `DemoWorkb
 > - Supports both **ESM** (`import`) and **CommonJS** (`require`) builds.
 > - Written with React and ships TypeScript declaration files.
 > - The package injects reusable shell styles automatically from its main JS bundle.
-> - Project/demo CSS is still loaded by the consuming project through `styleLoader`.
+> - Project CSS is loaded by the consuming project through `styleLoader`; demos only declare the compiled CSS names they need via `export const cssFiles`.
 > - React and React DOM are peer dependencies, so the host app keeps one React instance.
 > - Ships a flat light/dark UI with `grey`, `blue` and `brown` color presets. Users
 >   switch the mode from the header toggle and the color from the title dropdown; both
@@ -89,43 +89,43 @@ export default function App() {
 
 That's it: the package owns the shell (grid, search, theme, opened-demo modal, persisted state), while your project owns the screens and their styles.
 
-<h4 id="demo-css"></h4>
+<details id="demo-css"><summary><b>✦ Demo CSS</b></summary><br /><ul><div>
 
-> **✦ Demo CSS**
->
-> A preview loads only the scoped CSS you point it at, and a demo declares that itself by exporting `cssFiles` — compiled file names (without extension) from `styles.outputDir` — right next to the component:
->
-> ```tsx
-> // src/screens/GuardianChestsWindow.tsx
-> export const cssFiles = ["guardian-chests-window", "screen-superhero"];
->
-> export default function GuardianChestsWindow() {
->   return /* ... */;
-> }
-> ```
->
-> The list lives with the demo, so there is one obvious place for a screen's styles. Shell-wide styles that apply to every preview (reset, tokens, keyframes) go through the `baseStyles` prop instead. Omit `cssFiles` if a demo needs no scoped CSS.
+A preview loads only the scoped CSS you point it at. A demo declares that itself by exporting `cssFiles` — compiled file names (without extension) from `styles.outputDir` — right next to the component:
 
-<h4 id="demo-component"></h4>
+```tsx
+// src/screens/GuardianChestsWindow.tsx
+export const cssFiles = ["guardian-chests-window", "screen-superhero"];
 
-> **✦ Demo component props**
->
-> A demo's default export is a normal React component. The workbench renders it both as a small grid preview and as the opened full-screen view, and passes these optional props (typed as `DemoComponentProps`):
->
-> - `pageName?: string` — the demo's stable name (its `DemoItem.name`).
-> - `isActive?: boolean` — `true` only while the demo is opened full-screen, `false` in the grid preview. Gate expensive work (timers, canvases, data fetching) on it so it runs for the opened demo, not for every card in the pool.
-> - `children?: ReactNode` — the host overlay from `renderDemoContent`, provided only when opened. Render it wherever the demo wants the project layer.
->
-> ```tsx
-> export default function GuardianChestsWindow({ isActive, children }) {
->   return (
->     <div className="screen">
->       {isActive ? <HeavyAnimation /> : <StaticPreview />}
->       {children}
->     </div>
->   );
-> }
-> ```
+export default function GuardianChestsWindow() {
+  return /* ... */;
+}
+```
+
+The list lives with the demo, so there is one obvious place for a screen's styles. Shell-wide styles that apply to every preview (reset, tokens, keyframes) go through the `baseStyles` prop instead. Omit `cssFiles` if a demo needs no scoped CSS.
+
+</div></ul></details>
+
+<details id="demo-component"><summary><b>✦ Demo component props</b></summary><br /><ul><div>
+
+A demo's default export is a normal React component. The workbench renders it both as a small grid preview and as the opened full-screen view, and passes these optional props (typed as `DemoComponentProps`):
+
+- `pageName?: string` — the demo's stable name (its `DemoItem.name`).
+- `isActive?: boolean` — `true` only while the demo is opened full-screen, `false` in the grid preview. Gate expensive work (timers, canvases, data fetching) on it so it runs for the opened demo, not for every card in the pool.
+- `children?: ReactNode` — the host overlay from `renderDemoContent`, provided only when opened. Render it wherever the demo wants the project layer.
+
+```tsx
+export default function GuardianChestsWindow({ isActive, children }) {
+  return (
+    <div className="screen">
+      {isActive ? <HeavyAnimation /> : <StaticPreview />}
+      {children}
+    </div>
+  );
+}
+```
+
+</div></ul></details>
 
 <h2></h2>
 
@@ -186,8 +186,6 @@ Use `autoScale` only when demos are designed for a known canvas or game/screen s
 
 <b>Return:</b><br />
 Returns a React element containing the complete reusable workbench shell.
-
-Project-level SVG filters/defs should be rendered by the host app as normal siblings near `DemoWorkbench`, not through a workbench prop.
 
 </div></ul></details>
 

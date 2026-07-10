@@ -23,7 +23,7 @@ function warnMissingStyleLoader(fileNames: readonly string[]) {
 
   warnDevelopment(
     "missing-style-loader",
-    `styleLoader is missing, but styles are requested (${fileNames.join(", ")}). Pass styleLoader or remove baseStyles/cssFiles.`,
+    `styleLoader is missing, but styles are requested (${fileNames.join(", ")}). Pass styleLoader or remove baseStyles / demo cssFiles exports.`,
   );
 }
 
