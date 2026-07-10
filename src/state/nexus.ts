@@ -1,18 +1,13 @@
-import { createReactNexus } from "nexus-state";
+import { persist } from "nexus-state";
+import { createReactNexus } from "nexus-state/react";
 
 import { getHashWorkbenchState } from "../utils/workbenchPosition";
-import { readStoredWorkbenchState } from "../utils/workbenchStorageState";
-import type { DemoWorkbenchStorageEntry } from "../types/internal";
 
 export type WorkbenchPageData = {
   scrollTop?: number | string;
   top?: number | string;
   left?: number | string;
 } | null;
-
-export type WorkbenchFileRegistry = {
-  demos: string[];
-};
 
 export type WorkbenchThemeColor = "grey" | "blue" | "brown";
 
@@ -37,41 +32,21 @@ export type WorkbenchStateUpdate =
   | Partial<WorkbenchState>
   | ((state: WorkbenchState) => Partial<WorkbenchState>);
 
-// Keys persisted across reloads, all in localStorage so the choice survives a
-// browser restart and there is only one storage to reason about. Read once
-// below to seed nexus before any component renders — no default-state flash.
-export const defaultStorageData: DemoWorkbenchStorageEntry[] = [
-  ["activePage", "local"],
-  ["darkTheme", "local"],
-  ["themeColor", "local"],
-  ["searchText", "local"],
-  ["pageData", "local"],
-  ["scrollTop", "local"],
+// Navigation + preference keys persisted across reloads. `persist` stores them
+// as one namespaced localStorage entry, so generic names like "scrollTop" never
+// collide with the host app's own keys. windowScale/workbenchScope stay out:
+// the former is recomputed by a ResizeObserver, the latter is a constant.
+const PERSIST_KEY = "demo-workbench";
+const PERSISTED_KEYS: (keyof WorkbenchState)[] = [
+  "activePage",
+  "darkTheme",
+  "themeColor",
+  "searchText",
+  "pageData",
+  "scrollTop",
 ];
 
-function getInitialWorkbenchState(): Partial<WorkbenchState> {
-  const stored = readStoredWorkbenchState(defaultStorageData);
-  const hashState = getHashWorkbenchState();
-  if (!hashState) return stored;
-
-  // A hash link only carries navigation; keep the stored theme preferences and
-  // overlay the opened-demo position from the hash on top of them. The card
-  // position is preserved so closing the demo in this tab shrinks the overlay
-  // back onto the card instead of the viewport corner.
-  return {
-    ...stored,
-    activePage: hashState.activePage,
-    pageData: {
-      scrollTop: hashState.scrollTop,
-      top: hashState.top,
-      left: hashState.left,
-    },
-    searchText: hashState.searchText,
-    scrollTop: hashState.scrollTop,
-  };
-}
-
-const nexus = createReactNexus<WorkbenchState, object>({
+const nexus = createReactNexus<WorkbenchState>({
   state: {
     activePage: "",
     darkTheme: false,
@@ -81,8 +56,33 @@ const nexus = createReactNexus<WorkbenchState, object>({
     scrollTop: 0,
     windowScale: null,
     workbenchScope: "[workbench-scope]",
-    ...getInitialWorkbenchState(),
   },
 });
+
+// Hydrates synchronously from localStorage before the first render (no
+// default-state flash), then debounces write-back. localStorage keeps the
+// choice across a browser restart; on the server it is a no-op.
+persist(nexus, {
+  key: PERSIST_KEY,
+  include: PERSISTED_KEYS,
+  debounce: 150,
+});
+
+// A hash link only carries navigation; overlay it on top of the hydrated
+// preferences. The card position from the hash is kept so closing a demo opened
+// in a new tab shrinks the overlay back onto its card, not the viewport corner.
+const hashState = getHashWorkbenchState();
+if (hashState) {
+  nexus.set({
+    activePage: hashState.activePage,
+    pageData: {
+      scrollTop: hashState.scrollTop,
+      top: hashState.top,
+      left: hashState.left,
+    },
+    searchText: hashState.searchText,
+    scrollTop: hashState.scrollTop,
+  });
+}
 
 export default nexus;

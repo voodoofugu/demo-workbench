@@ -34,6 +34,7 @@ function lightPalette({ h, s, sn }: ThemeHsl): Tokens {
     "--dw-accent-soft": hsl(h, s * 0.85, 90),
     "--dw-ring": hsl(h, s, 66),
     "--dw-danger": "hsl(2 75% 48%)",
+    "--dw-glow": hsl(h, s * 0.8, 82),
   };
 }
 
@@ -51,6 +52,7 @@ function darkPalette({ h, s, sn }: ThemeHsl): Tokens {
     "--dw-accent-soft": hsl(h, s * 0.7, 24),
     "--dw-ring": hsl(h, s, 45),
     "--dw-danger": "hsl(2 80% 71%)",
+    "--dw-glow": hsl(h, s, 20),
   };
 }
 
@@ -567,13 +569,37 @@ const workbenchStyles: StyledAtomStyles = {
       transform: "scale(0.97)",
     },
     "&.fallback-card": {
-      pointerEvents: "none",
+      cursor: "pointer",
+      ".demo-workbench-card-link": {
+        pointerEvents: "none",
+      },
+      "&:hover": {
+        // border: "1px solid var(--dw-accent)",
+        ".demo-workbench-preview-frame .content .emoji": {
+          "&::before": {
+            display: "none",
+          },
+          "&::after": {
+            content: "0 ____ 0",
+          },
+        },
+      },
+      "&:active": {
+        ".demo-workbench-preview-frame .content .emoji": {
+          "&::before": {
+            display: "none",
+          },
+          "&::after": {
+            content: "＞____＜",
+          },
+        },
+      },
       "@keyframes fallback-card-anim": {
         "0%": {
           transform: "rotate(5deg) translateY(0)",
         },
         "50%": {
-          transform: "rotate(4deg) translateY(-10px)",
+          transform: "rotate(4deg) translateY(-12px)",
         },
         "100%": {
           transform: "rotate(5deg) translateY(0)",
@@ -582,15 +608,15 @@ const workbenchStyles: StyledAtomStyles = {
       "@keyframes fallback-shadow-anim": {
         "0%": {
           boxShadow:
-            "inset 0 0 0 1px var(--dw-border), var(--dw-shadow-sm), 0 0 0 0px rgba(255, 255, 255, 0.05)",
+            "inset 0 0 0 1px var(--dw-border), var(--dw-shadow-sm), 0 0 0 0px color-mix(in srgb, var(--dw-glow) 50%, transparent)",
         },
         "100%": {
           boxShadow:
-            "inset 0 0 0 1px var(--dw-border), var(--dw-shadow-sm), 0 0 0 20px rgba(255, 255, 255, 0)",
+            "inset 0 0 0 1px var(--dw-border), var(--dw-shadow-sm), 0 0 0 20px color-mix(in srgb, var(--dw-glow) 0%, transparent)",
         },
       },
       animation:
-        "fallback-card-anim 6s cubic-bezier(0.4, 0, 0.6, 1) 0s infinite, fallback-shadow-anim 2s cubic-bezier(0.4, 0, 0.6, 1) 0s infinite",
+        "fallback-card-anim 10s cubic-bezier(0.4, 0, 0.6, 1) 0s infinite, fallback-shadow-anim 2s cubic-bezier(0.4, 0, 0.6, 1) 0s infinite",
       ".content": {
         width: "100%",
         height: "100%",

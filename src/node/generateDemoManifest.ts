@@ -7,7 +7,7 @@ import path from "node:path";
  * ### ***WorkbenchFileNameDiscoveryOptions***:
  * options for reading sorted workbench file basenames from a directory.
  * @description
- * Used by `discoverWorkbenchFileNames`, registry generation and host scripts that need the same file filtering rules as `demo-workbench`.
+ * Used by `discoverWorkbenchFileNames`, manifest generation and host scripts that need the same file filtering rules as `demo-workbench`.
  * @example
  * ```ts
  * const options: WorkbenchFileNameDiscoveryOptions = {
@@ -68,8 +68,21 @@ export type GenerateDemoManifestResult = {
   demos: string[];
 };
 
+type WorkbenchDiscoveredFile = {
+  name: string;
+  fileName: string;
+};
+
 const DEFAULT_EXTENSIONS = [".jsx", ".tsx", ".js", ".ts"];
 const DEFAULT_EXCLUDE = ["Template"];
+const MODULE_OUTPUT_EXTENSIONS = new Set([
+  ".cjs",
+  ".js",
+  ".jsx",
+  ".mjs",
+  ".ts",
+  ".tsx",
+]);
 
 function normalizeExtensions(extensions?: string[]) {
   const source = extensions?.length ? extensions : DEFAULT_EXTENSIONS;
@@ -100,6 +113,40 @@ function isWorkbenchEntryFile(entry: Dirent, extensions: Set<string>, exclude: S
   return !exclude.has(name);
 }
 
+async function discoverWorkbenchFiles(
+  options: WorkbenchFileNameDiscoveryOptions,
+): Promise<WorkbenchDiscoveredFile[]> {
+  const inputDir = path.resolve(options.inputDir);
+  const extensions = normalizeExtensions(options.extensions);
+  const exclude = new Set(options.exclude ?? DEFAULT_EXCLUDE);
+
+  const entries: Dirent[] = await readdir(inputDir, { withFileTypes: true });
+  const files = entries
+    .filter((entry) => isWorkbenchEntryFile(entry, extensions, exclude))
+    .map((entry) => {
+      const extension = path.extname(entry.name);
+      return {
+        name: path.basename(entry.name, extension),
+        fileName: entry.name,
+      };
+    })
+    .sort((left, right) => left.name.localeCompare(right.name));
+
+  const seen = new Set<string>();
+  for (const file of files) {
+    if (!seen.has(file.name)) {
+      seen.add(file.name);
+      continue;
+    }
+
+    throw new Error(
+      `Duplicate demo basename "${file.name}". Keep only one matching demo file with that basename.`,
+    );
+  }
+
+  return files;
+}
+
 /**---
  * ## ![logo](https://github.com/voodoofugu/demo-workbench/raw/main/src/assets/demo-workbench-logo.png)
  * ### ***discoverWorkbenchFileNames***:
@@ -114,22 +161,15 @@ function isWorkbenchEntryFile(entry: Dirent, extensions: Set<string>, exclude: S
  * ```
  */
 export async function discoverWorkbenchFileNames(options: WorkbenchFileNameDiscoveryOptions) {
-  const inputDir = path.resolve(options.inputDir);
-  const extensions = normalizeExtensions(options.extensions);
-  const exclude = new Set(options.exclude ?? DEFAULT_EXCLUDE);
-
-  const entries: Dirent[] = await readdir(inputDir, { withFileTypes: true });
-  return entries
-    .filter((entry) => isWorkbenchEntryFile(entry, extensions, exclude))
-    .map((entry) => path.basename(entry.name, path.extname(entry.name)))
-    .sort((left, right) => left.localeCompare(right));
+  const files = await discoverWorkbenchFiles(options);
+  return files.map((file) => file.name);
 }
 
-function renderDemoManifest(demos: string[], importPathPrefix: string) {
+function renderDemoManifest(demos: WorkbenchDiscoveredFile[], importPathPrefix: string) {
   const prefix = toImportPath(importPathPrefix).replace(/\/$/, "");
-  const lines = demos.map((name) => {
-    const encodedName = JSON.stringify(name);
-    return `  { name: ${encodedName}, load: () => import(${JSON.stringify(`${prefix}/${name}`)}) },`;
+  const lines = demos.map((demo) => {
+    const encodedName = JSON.stringify(demo.name);
+    return `  { name: ${encodedName}, load: () => import(${JSON.stringify(`${prefix}/${demo.fileName}`)}) },`;
   });
 
   return [
@@ -141,6 +181,38 @@ function renderDemoManifest(demos: string[], importPathPrefix: string) {
     "export default demos;",
     "",
   ].join("\n");
+}
+
+function assertDemoManifestOutputFile(value: string) {
+  if (typeof value !== "string") {
+    throw new Error("demos.outputFile must be a non-empty file path.");
+  }
+
+  if (!value.trim()) {
+    throw new Error("demos.outputFile must be a non-empty file path.");
+  }
+
+  if (/[\\/]$/.test(value)) {
+    throw new Error(
+      `demos.outputFile must include a file name, received: ${value}`,
+    );
+  }
+}
+
+function toDemoManifestOutputFile(outputFile: string) {
+  const parsed = path.parse(outputFile);
+  if (!parsed.name || parsed.base === "." || parsed.base === "..") {
+    throw new Error(
+      `demos.outputFile must include a file name, received: ${outputFile}`,
+    );
+  }
+
+  if (parsed.ext.toLowerCase() === ".js") return outputFile;
+  if (MODULE_OUTPUT_EXTENSIONS.has(parsed.ext.toLowerCase())) {
+    return path.join(parsed.dir, `${parsed.name}.js`);
+  }
+
+  return `${outputFile}.js`;
 }
 
 function renderNameList(names: string[], outputFile: string, exportName = "names") {
@@ -162,7 +234,7 @@ function renderNameList(names: string[], outputFile: string, exportName = "names
  * ### ***generateNameList***:
  * discover file basenames and write them to a JS or JSON file.
  * @description
- * Internal helper used by demo registry generation and useful for scripts that need a plain generated name list.
+ * Internal helper used by demo manifest generation and useful for scripts that need a plain generated name list.
  */
 export async function generateNameList(
   options: GenerateNameListOptions,
@@ -188,14 +260,19 @@ export async function generateNameList(
 export async function generateDemoManifest(
   options: GenerateDemoManifestOptions,
 ): Promise<GenerateDemoManifestResult> {
+  assertDemoManifestOutputFile(options.outputFile);
   const inputDir = path.resolve(options.inputDir);
-  const outputFile = path.resolve(options.outputFile);
+  const outputFile = toDemoManifestOutputFile(path.resolve(options.outputFile));
   const outputDir = path.dirname(outputFile);
   const importPathPrefix = options.importPathPrefix ?? (path.relative(outputDir, inputDir) || ".");
-  const demos = await discoverWorkbenchFileNames(options);
+  const demoFiles = await discoverWorkbenchFiles(options);
 
   await mkdir(outputDir, { recursive: true });
-  await writeFile(outputFile, renderDemoManifest(demos, importPathPrefix));
+  await writeFile(outputFile, renderDemoManifest(demoFiles, importPathPrefix));
 
-  return { inputDir, outputFile, demos };
+  return {
+    inputDir,
+    outputFile,
+    demos: demoFiles.map((file) => file.name),
+  };
 }

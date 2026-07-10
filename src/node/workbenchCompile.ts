@@ -15,7 +15,10 @@ import path from "node:path";
 import { transform } from "lightningcss";
 import * as sass from "sass-embedded";
 
-import { discoverWorkbenchFileNames } from "./generateDemoManifest";
+import {
+  discoverWorkbenchFileNames,
+  generateDemoManifest,
+} from "./generateDemoManifest";
 import { toWorkbenchStyleClassName } from "../utils/workbenchStyleScope";
 
 /**---
@@ -66,7 +69,7 @@ export type WorkbenchCompileStylesOptions = {
   compileForWorkbench?: boolean;
   /** Optional prefix added to relative `url(...)` assets during compilation. Absolute/data/hash URLs are left unchanged. */
   assetUrlPrefix?: string;
-  /** Remove `outputDir` before a full style compile. Ignored for incremental single-file watch rebuilds. */
+  /** Remove `outputDir` before a full style compile. Defaults to `true`; pass `false` only when the output directory intentionally contains files managed outside `demo-workbench`. Ignored for incremental single-file watch rebuilds. */
   clean?: boolean;
 };
 
@@ -75,11 +78,12 @@ export type WorkbenchCompileStylesOptions = {
  * ### ***WorkbenchCompileDemoOptions***:
  * options for discovering demo page files.
  * @description
- * File basenames become workbench demo names and are written to the generated registry when a writable registry target is available.
+ * File basenames become workbench demo names and are written to a host-owned generated manifest.
  * @example
  * ```ts
  * const demos: WorkbenchCompileDemoOptions = {
  *   inputDir: "src/components/pages",
+ *   outputFile: "src/components/templateComponents/myDemos",
  * };
  * ```
  */
@@ -90,6 +94,10 @@ export type WorkbenchCompileDemoOptions = {
   extensions?: string[];
   /** Basenames to exclude from the generated list. Defaults match the internal file discovery rules. */
   exclude?: string[];
+  /** Host-owned manifest path generated for `<DemoWorkbench demos={demos} />`. Use the desired path without an extension; the compiler writes it as a `.js` file. */
+  outputFile: string;
+  /** Import path prefix used by the generated manifest. Defaults to the relative path from `outputFile` to `inputDir`. */
+  importPathPrefix?: string;
 };
 
 /**---
@@ -102,14 +110,17 @@ export type WorkbenchCompileDemoOptions = {
  * ```ts
  * runWorkbenchCompile({
  *   styles: { inputDir: "styles/scss", outputDir: "src/workbench-css" },
- *   demos: { inputDir: "src/components/pages" },
+ *   demos: {
+ *     inputDir: "src/components/pages",
+ *     outputFile: "src/components/templateComponents/myDemos",
+ *   },
  * });
  * ```
  */
 export type WorkbenchCompileOptions = {
   /** Optional style compilation section. */
   styles?: WorkbenchCompileStylesOptions;
-  /** Optional demo page registry section. */
+  /** Optional demo manifest section. */
   demos?: WorkbenchCompileDemoOptions;
   /** Print Sass/CSS compiler warnings and debug output. Defaults to `true`. Command progress logs are always printed by `runWorkbenchCompile`. */
   styleLogs?: boolean;
@@ -134,16 +145,16 @@ export type WorkbenchCompileStylesResult = {
 /**---
  * ## ![logo](https://github.com/voodoofugu/demo-workbench/raw/main/src/assets/demo-workbench-logo.png)
  * ### ***WorkbenchCompileDemoResult***:
- * result of discovering the generated demo name list.
+ * result of discovering the generated demo manifest.
  * @description
- * `names` are sorted file basenames. `outputFiles` contains registry files that were updated, and can be empty when no writable target exists.
+ * `names` are sorted file basenames. `outputFiles` contains the generated host manifest file.
  */
 export type WorkbenchCompileDemoResult = {
   /** Absolute directory that was scanned. */
   inputDir: string;
   /** Generated names sorted by filename. */
   names: string[];
-  /** Registry files updated with the generated `{ demos }` data. Empty when no writable registry target exists. */
+  /** Host manifest files written with the generated `{ demos }` data. */
   outputFiles: string[];
 };
 
@@ -157,7 +168,7 @@ export type WorkbenchCompileDemoResult = {
 export type WorkbenchCompileResult = {
   /** Style compilation result, when `styles` options were compiled. */
   styles?: WorkbenchCompileStylesResult;
-  /** Demo registry result, when `demos` options were compiled. */
+  /** Demo manifest result, when `demos` options were compiled. */
   demos?: WorkbenchCompileDemoResult;
 };
 
@@ -171,7 +182,10 @@ export type WorkbenchCompileResult = {
  * ```ts
  * runWorkbenchCompile({
  *   styles: { inputDir: "styles/scss", outputDir: "src/workbench-css" },
- *   demos: { inputDir: "src/components/pages" },
+ *   demos: {
+ *     inputDir: "src/components/pages",
+ *     outputFile: "src/components/templateComponents/myDemos",
+ *   },
  *   args: ["--watch"],
  * });
  * ```
@@ -199,7 +213,10 @@ export type WorkbenchCompileWatchOptions = WorkbenchCompileOptions & {
  * ```ts
  * runWorkbenchCompile({
  *   styles: { inputDir: "styles/scss", outputDir: "src/workbench-css" },
- *   demos: { inputDir: "src/components/pages" },
+ *   demos: {
+ *     inputDir: "src/components/pages",
+ *     outputFile: "src/components/templateComponents/myDemos",
+ *   },
  * });
  * ```
  */
@@ -704,7 +721,7 @@ async function printWorkbenchCompileWarnings(
     }
 
     if (result.demos.outputFiles.length === 0) {
-      printWorkbenchWarning("demo registry was not updated");
+      printWorkbenchWarning("demo manifest was not updated");
     }
   }
 }
@@ -736,15 +753,6 @@ async function findStyleFiles(inputDir: string): Promise<string[]> {
     .sort((left: string, right: string) => left.localeCompare(right));
 }
 
-async function fileExists(filePath: string) {
-  try {
-    await readFile(filePath);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 async function writeFileIfChanged(filePath: string, content: string) {
   try {
     if ((await readFile(filePath, "utf8")) === content) {
@@ -758,112 +766,33 @@ async function writeFileIfChanged(filePath: string, content: string) {
   return true;
 }
 
-function renderGeneratedRegistry(registry: { demos: string[] }) {
-  return [
-    'import type { WorkbenchFileRegistry } from "./nexus";',
-    "",
-    "export const generatedWorkbenchRegistry: WorkbenchFileRegistry = {",
-    `  demos: ${JSON.stringify(registry.demos, null, 2).replace(/\n/g, "\n  ")},`,
-    "};",
-    "",
-    "export default generatedWorkbenchRegistry;",
-    "",
-  ].join("\n");
-}
-
-async function writeGeneratedRegistrySource(registry: { demos: string[] }) {
-  const candidates = [
-    path.resolve(
-      process.cwd(),
-      "../demo-workbench/src/state/generatedWorkbenchRegistry.ts",
-    ),
-    path.resolve(
-      process.cwd(),
-      "node_modules/demo-workbench/src/state/generatedWorkbenchRegistry.ts",
-    ),
-  ];
-  const outputFile = (
-    await Promise.all(
-      candidates.map(async (filePath) =>
-        (await fileExists(filePath)) ? filePath : null,
-      ),
-    )
-  ).find((filePath): filePath is string => Boolean(filePath));
-
-  if (!outputFile) return null;
-
-  await writeFileIfChanged(outputFile, renderGeneratedRegistry(registry));
-  return outputFile;
-}
-
-function renderBundledRegistry(registry: { demos: string[] }) {
-  return `generatedWorkbenchRegistry = {\n  demos: ${JSON.stringify(registry.demos, null, 2).replace(/\n/g, "\n  ")}\n}`;
-}
-
-async function writeGeneratedRegistryBundle(registry: { demos: string[] }) {
-  const candidates = [
-    path.resolve(process.cwd(), "../demo-workbench/dist/index.js"),
-    path.resolve(process.cwd(), "../demo-workbench/dist/index.cjs"),
-    path.resolve(process.cwd(), "node_modules/demo-workbench/dist/index.js"),
-    path.resolve(process.cwd(), "node_modules/demo-workbench/dist/index.cjs"),
-  ];
-  const outputFiles = (
-    await Promise.all(
-      candidates.map(async (filePath) =>
-        (await fileExists(filePath)) ? filePath : null,
-      ),
-    )
-  ).filter((filePath): filePath is string => Boolean(filePath));
-  // Match only the assignment expression: minifiers may fold the declaration
-  // into a `var a=…,generatedWorkbenchRegistry={…},b=…` sequence, so the
-  // pattern must not depend on a leading keyword or a trailing semicolon.
-  const registryPattern =
-    /generatedWorkbenchRegistry\s*=\s*\{\s*demos\s*:\s*\[[\s\S]*?\]\s*\}/;
-  const renderedRegistry = renderBundledRegistry(registry);
-  const writtenFiles: string[] = [];
-
-  for (const outputFile of outputFiles) {
-    const source = await readFile(outputFile, "utf8");
-    if (!registryPattern.test(source)) continue;
-    await writeFileIfChanged(
-      outputFile,
-      source.replace(registryPattern, () => renderedRegistry),
-    );
-    writtenFiles.push(outputFile);
-  }
-
-  return writtenFiles;
-}
-
-async function writeGeneratedRegistry(registry: { demos: string[] }) {
-  const [sourceFile, bundleFiles] = await Promise.all([
-    writeGeneratedRegistrySource(registry),
-    writeGeneratedRegistryBundle(registry),
-  ]);
-
-  return [sourceFile, ...bundleFiles].filter((filePath): filePath is string =>
-    Boolean(filePath),
-  );
-}
-
-async function compileGeneratedRegistry(
+async function compileGeneratedManifest(
   options: WorkbenchCompileOptions,
 ): Promise<Pick<WorkbenchCompileResult, "demos">> {
   if (!options.demos) return {};
+  if (!options.demos.outputFile) {
+    throw new Error(
+      "demos.outputFile is required. Generate a host-owned manifest and pass it to <DemoWorkbench demos={demos} />.",
+    );
+  }
 
-  const demoNames = await discoverWorkbenchFileNames({
+  const discoveryOptions = {
     inputDir: options.demos.inputDir,
     extensions: options.demos.extensions,
     exclude: options.demos.exclude,
+  };
+  const demoNames = await discoverWorkbenchFileNames(discoveryOptions);
+  const manifest = await generateDemoManifest({
+    ...discoveryOptions,
+    outputFile: options.demos.outputFile,
+    importPathPrefix: options.demos.importPathPrefix,
   });
-
-  const outputFiles = await writeGeneratedRegistry({ demos: demoNames });
 
   return {
     demos: {
       inputDir: path.resolve(options.demos.inputDir),
       names: demoNames,
-      outputFiles,
+      outputFiles: [manifest.outputFile],
     },
   };
 }
@@ -953,7 +882,7 @@ async function compileStyles(
   const inputDir = path.resolve(options.inputDir);
   const outputDir = path.resolve(options.outputDir);
 
-  if (!events?.length && options.clean) {
+  if (!events?.length && options.clean !== false) {
     await rm(outputDir, { recursive: true, force: true });
   }
   await mkdir(outputDir, { recursive: true });
@@ -1017,9 +946,9 @@ async function compileWorkbench(
   if (styles) {
     await writeStyleReloadManifest(styles.outputDir, { enabled: false });
   }
-  const registry = await compileGeneratedRegistry(options);
+  const manifest = await compileGeneratedManifest(options);
 
-  return { styles, ...registry };
+  return { styles, ...manifest };
 }
 
 async function workbenchCompile(
@@ -1308,12 +1237,12 @@ async function compileWatchEvents(
           )
         : undefined
     : undefined;
-  const registry = demoFileListChanged
-    ? await compileGeneratedRegistry(options)
+  const manifest = demoFileListChanged
+    ? await compileGeneratedManifest(options)
     : {};
 
-  if (!styles && !registry.demos) return {};
-  return { styles, ...registry };
+  if (!styles && !manifest.demos) return {};
+  return { styles, ...manifest };
 }
 
 async function watchWorkbenchCompile(
@@ -1499,7 +1428,10 @@ function closeWatcherOnSignal(watcher: WorkbenchCompileWatchResult) {
  *
  * runWorkbenchCompile({
  *   styles: { inputDir: "styles/scss", outputDir: "src/workbench-css" },
- *   demos: { inputDir: "src/components/pages" },
+ *   demos: {
+ *     inputDir: "src/components/pages",
+ *     outputFile: "src/components/templateComponents/myDemos",
+ *   },
  * });
  * ```
  */

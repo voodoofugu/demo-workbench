@@ -46,21 +46,6 @@ export type DemoItem = {
   cssFiles?: string[];
 };
 
-/**---
- * ## ![logo](https://github.com/voodoofugu/demo-workbench/raw/main/src/assets/demo-workbench-logo.png)
- * ### ***DemoWorkbenchDemoLoader***:
- * lazy loader used for names from the generated workbench registry.
- * @param name generated demo basename.
- * @description
- * `runWorkbenchCompile` discovers demo file basenames and stores them in the generated registry. `DemoWorkbench` calls this loader for each generated name when it needs the React module.
- * @example
- * ```ts
- * const demoLoader: DemoWorkbenchDemoLoader = (name) =>
- *   import(`./pages/${name}`);
- * ```
- */
-export type DemoWorkbenchDemoLoader = (name: string) => Promise<DemoModule>;
-
 export type DemoWorkbenchAutoScaleDimension = number | null;
 
 export type DemoWorkbenchAutoScaleOptions = {
@@ -88,12 +73,12 @@ export type DemoWorkbenchAutoScale = DemoWorkbenchAutoScaleOptions | false;
  * ### ***DemoWorkbenchProps***:
  * props for the reusable React workbench shell.
  * @description
- * Minimal setup is a title, a generated-registry `demoLoader` and optional style loading. The host project keeps ownership of demo components, CSS imports, project overlays and optional opened-demo content.
+ * Minimal setup is a title, generated `demos` and optional style loading. The host project keeps ownership of demo components, CSS imports, project overlays and optional opened-demo content.
  * @example
  * ```tsx
  * <DemoWorkbench
  *   title="Project demos"
- *   demoLoader={(name) => import(`./pages/${name}`)}
+ *   demos={demos}
  *   styleLoader={(name) => import(`./workbench-css/${name}.css`)}
  *   baseStyles={["output", "theme"]}
  * />
@@ -102,8 +87,8 @@ export type DemoWorkbenchAutoScale = DemoWorkbenchAutoScaleOptions | false;
 export type DemoWorkbenchProps = {
   /** Shell title shown in the workbench header and document title. */
   title?: string;
-  /** Loader for generated demo names stored in the internal workbench registry. */
-  demoLoader: DemoWorkbenchDemoLoader;
+  /** Generated demo manifest owned by the host project. */
+  demos: DemoItem[];
   /** Dynamic style loader used by `styled-atom`, e.g. `(name) => import(...)`. */
   styleLoader?: (name: string) => Promise<unknown>;
   /** Host-level styled-atom CSS files loaded by the workbench shell. */
@@ -116,6 +101,4 @@ export type DemoWorkbenchProps = {
   renderDemoContent?: (pageName: string) => ReactNode;
   /** Optional inline background value for the opened demo body. Defaults to `#fff`. */
   bodyBg?: string;
-  /** Component rendered when search/hash points to a missing demo. */
-  notFoundComponent?: ComponentType;
 };

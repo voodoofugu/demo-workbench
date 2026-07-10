@@ -1,13 +1,15 @@
 import { useEffect, useState } from "react";
 
-type ImportModuleT = () => Promise<Record<string, any>>;
+import { warnDevelopment } from "../utils/devWarnings";
 
-const useDynamicModule = (
+type DynamicModuleLoader<Module> = () => Promise<Module>;
+
+const useDynamicModule = <Module,>(
   name: string,
-  importModule?: ImportModuleT,
+  importModule?: DynamicModuleLoader<Module>,
   options: { enabled?: boolean } = {},
 ) => {
-  const [module, setModule] = useState<null | Record<string, any>>(null);
+  const [module, setModule] = useState<Module | null>(null);
   const enabled = options.enabled ?? true;
 
   useEffect(() => {
@@ -33,7 +35,11 @@ const useDynamicModule = (
         }
       } catch (error) {
         if (isActive) {
-          console.error(`Module "${name}" not found`, error);
+          warnDevelopment(
+            `dynamic-module-load:${name}`,
+            `module "${name}" failed to load.`,
+            error,
+          );
           setModule(null);
         }
       }

@@ -115,9 +115,9 @@ const DemoCell = memo(function DemoCell({
   const pageName = demo.name ?? demo.title ?? "Untitled demo";
   const shouldLoadDynamicModule =
     !demo.Component && (mode === "page" || isDemoLoaded || !isScrolling);
-  const loadedModule = useDynamicModule(pageName, demo.load, {
+  const loadedModule = useDynamicModule<DemoModule>(pageName, demo.load, {
     enabled: shouldLoadDynamicModule,
-  }) as DemoModule | null;
+  });
   const DynamicComponent = demo.Component ?? loadedModule?.default;
 
   const cssFiles = useMemo(

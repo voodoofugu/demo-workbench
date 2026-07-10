@@ -53,7 +53,7 @@ test("package-prepare creates a package with valid root and node export targets"
     existsSync(path.join(publishDir, nodeExport.require)),
     nodeExport.require,
   );
-  assert.equal(pkg.bin["demo-workbench-styles"], "dist/node/cli.js");
+  assert.equal(pkg.bin["demo-workbench-compile"], "dist/node/cli.js");
   assert.deepEqual(pkg.typesVersions["*"].node, ["./dist/node/index.d.ts"]);
   assert.equal(pkg.exports["./styles.css"], undefined);
   assert.equal(pkg.sideEffects, false);
@@ -76,6 +76,10 @@ test("node package entry exposes only the command runner", async () => {
 
   assert.deepEqual(Object.keys(nodeApi).sort(), ["runWorkbenchCompile"]);
   assert.match(nodeTypes, /export \{ runWorkbenchCompile \}/);
+  assert.match(
+    nodeTypes,
+    /export type \{[^}]*WorkbenchCompileDemoOptions[^}]*WorkbenchCompileStylesOptions[^}]*WorkbenchStyleReloadOptions[^}]*\}/s,
+  );
   assert.doesNotMatch(
     nodeTypes,
     /export \{[^}]*\b(?:workbenchCompile|watchWorkbenchCompile|discoverWorkbenchFileNames)\b/,
@@ -101,22 +105,15 @@ test("publish package contains only public package artifacts", async () => {
   assert.deepEqual(cssFiles, []);
 });
 
-test("published bundles ship an empty generated registry", async () => {
-  // Host projects patch the registry inside their own node_modules copy;
-  // the published package must never carry demo names from a host project.
-  const registrySource = await readFile(
-    path.join(root, "src/state/generatedWorkbenchRegistry.ts"),
-    "utf8",
+test("published bundles do not include an internal generated registry", async () => {
+  await assert.rejects(
+    readFile(path.join(root, "src/state/generatedWorkbenchRegistry.ts"), "utf8"),
+    { code: "ENOENT" },
   );
-  assert.match(registrySource, /demos:\s*\[\]/);
 
   for (const bundle of ["dist/index.js", "dist/index.cjs"]) {
     const bundledCode = await readFile(path.join(publishDir, bundle), "utf8");
-    assert.match(
-      bundledCode,
-      /generatedWorkbenchRegistry\s*=\s*\{\s*demos:\s*\[\]\s*\}/,
-      `${bundle} must contain an empty generated registry`,
-    );
+    assert.doesNotMatch(bundledCode, /generatedWorkbenchRegistry/);
   }
 });
 

@@ -11,6 +11,7 @@ type CliOptions = WorkbenchCompileStylesOptions & {
   styleReload?: boolean | WorkbenchStyleReloadOptions;
   styleLogs?: boolean;
   demoInputDir?: string;
+  demoOutputFile?: string;
 };
 
 function readFlag(args: string[], names: string[]) {
@@ -44,16 +45,32 @@ function parseArgs(args: string[]): CliOptions {
     throw new Error(
       [
         "Usage:",
-        "demo-workbench-styles build --input <stylesDir> --output <cssOutputDir>",
+        "demo-workbench-compile build --input <stylesDir> --output <cssOutputDir>",
         "[--production-css]",
         "[--asset-url-prefix http://localhost:3000/img/]",
         "[--pages-input <pagesDir>]",
-        "[--clean]",
+        "[--pages-output <manifestFile>]",
+        "[--no-clean]",
         "[--no-style-logs]",
         "[--style-reload]",
         "[--style-reload-port 38297]",
       ].join(" "),
     );
+  }
+
+  const demoInputDir = readFlag(args, [
+    "--pages-input",
+    "--demos-input",
+    "--demo-input",
+  ]);
+  const demoOutputFile = readFlag(args, [
+    "--pages-output",
+    "--demos-output",
+    "--demo-output",
+  ]);
+
+  if (demoInputDir && !demoOutputFile) {
+    throw new Error("--pages-output <manifestFile> is required when --pages-input is provided.");
   }
 
   const styleReloadPort = readFlag(args, ["--style-reload-port"]);
@@ -72,21 +89,26 @@ function parseArgs(args: string[]): CliOptions {
       ? false
       : undefined,
     assetUrlPrefix: readFlag(args, ["--asset-url-prefix", "--assetUrlPrefix"]),
-    clean: hasFlag(args, ["--clean"]),
+    clean: hasFlag(args, ["--no-clean"]) ? false : undefined,
     styleLogs: hasFlag(args, ["--no-style-logs", "--silent-styles"])
       ? false
       : undefined,
     watch: args[0] === "watch" || hasFlag(args, ["--watch"]),
     styleReload,
-    demoInputDir: readFlag(args, [
-      "--pages-input",
-      "--demos-input",
-      "--demo-input",
-    ]),
+    demoInputDir,
+    demoOutputFile,
   };
 }
 
 function toCompileOptions(options: CliOptions): WorkbenchCompileOptions {
+  const demos =
+    options.demoInputDir && options.demoOutputFile
+      ? {
+          inputDir: options.demoInputDir,
+          outputFile: options.demoOutputFile,
+        }
+      : undefined;
+
   return {
     styles: {
       inputDir: options.inputDir,
@@ -95,11 +117,7 @@ function toCompileOptions(options: CliOptions): WorkbenchCompileOptions {
       assetUrlPrefix: options.assetUrlPrefix,
       clean: options.clean,
     },
-    demos: options.demoInputDir
-      ? {
-          inputDir: options.demoInputDir,
-        }
-      : undefined,
+    demos,
     styleLogs: options.styleLogs,
   };
 }

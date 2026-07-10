@@ -111,66 +111,47 @@ test("buttons use safe click semantics and nexus functional updates", async () =
   assert.match(demoGrid, /nexus\.set\(\{ scrollTop:/);
 });
 
-test("storage hook only subscribes and persists future state changes", async () => {
-  const storageHook = await readFile(
-    path.join(root, "src/hooks/useStorageItems.js"),
-    "utf8",
-  );
-  const workbenchStorage = await readFile(
-    path.join(root, "src/state/WorkbenchStorage.tsx"),
-    "utf8",
-  );
-
-  assert.doesNotMatch(storageHook, /useState/);
-  assert.doesNotMatch(storageHook, /setTimeout/);
-  assert.doesNotMatch(storageHook, /readyToWrite|hydratedRef/);
-  assert.doesNotMatch(storageHook, /hydrateInitial/);
-  assert.doesNotMatch(storageHook, /hydratedStorageKeys/);
-  assert.doesNotMatch(storageHook, /store\.set\(/);
-  assert.match(storageHook, /getBrowserStorage/);
-  assert.match(storageHook, /store\.subscribe\(writeState/);
-  assert.match(storageHook, /state\[item\.name\]/);
-  assert.match(workbenchStorage, /useStorageItems\(storageData, nexus\)/);
-  assert.doesNotMatch(workbenchStorage, removedWorkbenchFacadeHook);
-});
-
-test("nexus seeds itself from hash/storage at module init instead of a render-blocking gate", async () => {
-  const [nexusState, demoWorkbench, storageState] = await Promise.all([
+test("nexus persists through nexus-state and overlays hash navigation on hydrated state", async () => {
+  const [nexusState, demoWorkbench] = await Promise.all([
     readFile(path.join(root, "src/state/nexus.ts"), "utf8"),
     readFile(path.join(root, "src/shell/DemoWorkbench.tsx"), "utf8"),
-    readFile(path.join(root, "src/utils/workbenchStorageState.ts"), "utf8"),
   ]);
 
-  assert.match(nexusState, /export const defaultStorageData/);
+  assert.match(nexusState, /import \{ persist \} from "nexus-state"/);
+  assert.match(nexusState, /createReactNexus \} from "nexus-state\/react"/);
+  assert.match(nexusState, /persist\(nexus, \{/);
+  assert.match(nexusState, /include: PERSISTED_KEYS/);
   assert.match(nexusState, /getHashWorkbenchState\(\)/);
-  assert.match(nexusState, /readStoredWorkbenchState\(defaultStorageData\)/);
   assert.match(nexusState, /activePage: hashState\.activePage/);
   assert.match(nexusState, /scrollTop: hashState\.scrollTop/);
   // The card position parsed from the hash must survive into pageData so
   // closing a demo opened in a new tab shrinks it back onto its card.
   assert.match(nexusState, /top: hashState\.top/);
   assert.match(nexusState, /left: hashState\.left/);
-  assert.match(nexusState, /\.\.\.getInitialWorkbenchState\(\)/);
   assert.doesNotMatch(nexusState, /baseCssFiles/);
 
-  assert.doesNotMatch(demoWorkbench, /WorkbenchStateProvider/);
-  assert.doesNotMatch(demoWorkbench, /restoredInitialState/);
+  // The bespoke storage layer is gone; DemoWorkbench no longer wires it up.
+  assert.doesNotMatch(demoWorkbench, /WorkbenchStorage/);
+  assert.doesNotMatch(demoWorkbench, /defaultStorageData/);
   assert.doesNotMatch(demoWorkbench, /nexus\.set/);
-  assert.match(
-    demoWorkbench,
-    /import \{ defaultStorageData \} from "\.\.\/state\/nexus"/,
-  );
   assert.match(
     demoWorkbench,
     /WorkbenchHostCssFilesProvider files=\{hostCssFiles\}/,
   );
 
-  assert.match(storageState, /normalizeStorageEntries/);
-  assert.match(storageState, /readStoredEntries\(normalizeStorageEntries\(storageData\)\)/);
-  await assert.rejects(
-    readFile(path.join(root, "src/state", removedWorkbenchFacadeFile), "utf8"),
-    { code: "ENOENT" },
-  );
+  // The removed storage-layer modules must not come back.
+  for (const gone of [
+    "src/hooks/useStorageItems.js",
+    "src/state/WorkbenchStorage.tsx",
+    "src/utils/workbenchStorageState.ts",
+    "src/utils/storage.js",
+    "src/types/internal.ts",
+    path.join("src/state", removedWorkbenchFacadeFile),
+  ]) {
+    await assert.rejects(readFile(path.join(root, gone), "utf8"), {
+      code: "ENOENT",
+    });
+  }
 });
 
 test("baseCssFiles reaches DemoCell via context, not the global nexus store", async () => {
@@ -211,9 +192,11 @@ test("DemoWorkbench keeps stable baseStyles and owns shell styles inline", async
   assert.match(publicTypes, /baseCssFiles\?:\s*string\[\]/);
   assert.match(publicTypes, /@deprecated Use `baseStyles` instead/);
   assert.match(publicTypes, /cssFiles\?:\s*string\[\]/);
-  assert.match(publicTypes, /demoLoader:\s*DemoWorkbenchDemoLoader/);
-  assert.doesNotMatch(publicTypes, /demos\?:\s*DemoItem\[\]/);
-  assert.doesNotMatch(demoWorkbench, /\bdemos,/);
+  assert.match(publicTypes, /demos:\s*DemoItem\[\]/);
+  assert.doesNotMatch(publicTypes, /demoLoader/);
+  assert.doesNotMatch(publicTypes, /DemoWorkbenchDemoLoader/);
+  assert.match(demoWorkbench, /\bdemos,/);
+  assert.doesNotMatch(demoWorkbench, /demoLoader/);
   assert.doesNotMatch(demoWorkbench, /resolvedDemos/);
   assert.doesNotMatch(publicTypes, /css\?:\s*string/);
   assert.doesNotMatch(publicTypes, /baseCss\?:\s*string/);
@@ -310,31 +293,37 @@ test("DemoWorkbench keeps stable baseStyles and owns shell styles inline", async
   assert.doesNotMatch(demoWorkbench, /shellCssFiles/);
 });
 
-test("default storage persists opened page as well as scroll/page data", async () => {
+test("persisted keys cover navigation and theme, and exclude derived state", async () => {
   const nexusState = await readFile(
     path.join(root, "src/state/nexus.ts"),
     "utf8",
   );
 
-  // Every persisted key lives in one storage (localStorage) so the choice is
-  // consistent and theme preferences survive a browser restart.
-  assert.match(nexusState, /\["activePage", "local"\]/);
-  assert.match(nexusState, /\["darkTheme", "local"\]/);
-  assert.match(nexusState, /\["themeColor", "local"\]/);
-  assert.match(nexusState, /\["searchText", "local"\]/);
-  assert.match(nexusState, /\["pageData", "local"\]/);
-  assert.match(nexusState, /\["scrollTop", "local"\]/);
-  // Derived/recomputed values must not be persisted.
+  // One namespaced localStorage entry instead of generic top-level keys.
+  assert.match(nexusState, /PERSIST_KEY = "demo-workbench"/);
+  assert.match(nexusState, /key: PERSIST_KEY/);
+  assert.match(nexusState, /PERSISTED_KEYS/);
+  for (const key of [
+    "activePage",
+    "darkTheme",
+    "themeColor",
+    "searchText",
+    "pageData",
+    "scrollTop",
+  ]) {
+    assert.match(nexusState, new RegExp(`"${key}"`));
+  }
+  // Derived/recomputed values are never persisted.
   assert.doesNotMatch(nexusState, /"searchData"/);
   assert.doesNotMatch(nexusState, /"windowScale"/);
-  // No session-storage entries remain; storage is unified.
-  assert.doesNotMatch(nexusState, /"session"/);
 });
 
 test("development warnings cover common host integration mistakes", async () => {
-  const [demoWorkbench, demoGrid, devWarnings] = await Promise.all([
+  const [demoWorkbench, demoGrid, dynamicModuleHook, devWarnings] =
+    await Promise.all([
     readFile(path.join(root, "src/shell/DemoWorkbench.tsx"), "utf8"),
     readFile(path.join(root, "src/components/DemoGrid.tsx"), "utf8"),
+    readFile(path.join(root, "src/hooks/useDynamicModule.tsx"), "utf8"),
     readFile(path.join(root, "src/utils/devWarnings.ts"), "utf8"),
   ]);
 
@@ -345,6 +334,9 @@ test("development warnings cover common host integration mistakes", async () => 
   assert.match(demoWorkbench, /warnInvalidDemoModule/);
   assert.match(demoWorkbench, /warnFailedDemoLoad/);
   assert.match(demoGrid, /missing-demo:/);
+  assert.match(dynamicModuleHook, /warnDevelopment/);
+  assert.doesNotMatch(dynamicModuleHook, /Record<string, any>/);
+  assert.doesNotMatch(dynamicModuleHook, /console\.error/);
 });
 
 test("DemoGrid tracks rendered demos during virtual scrolling", async () => {
@@ -390,7 +382,7 @@ test("DemoGrid derives MorphScroll theme and spacing from workbench state withou
     demoGrid,
     /edgeGradient=\{\{ color: getWorkbenchBg\(darkTheme, themeColor\) \}\}/,
   );
-  assert.match(demoGrid, /wrapperMargin=\{\[30, 20, 60, 20\]\}/);
+  assert.match(demoGrid, /wrapperMargin=\{\[50, 20, 50, 20\]\}/);
   assert.doesNotMatch(demoGrid, /\[&_\.ms-objects-wrapper\]/);
   assert.doesNotMatch(demoGrid, /ms-objects-wrapper/);
 });

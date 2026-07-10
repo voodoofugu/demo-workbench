@@ -6,9 +6,7 @@ const DemoFallback = ({
   title: string;
 }) => {
   return (
-    <div
-      className={`demo-workbench-card fallback-card ${className ? ` ${className}` : ""}`}
-    >
+    <div className={`demo-workbench-card fallback-card ${className}`}>
       <div className="demo-workbench-preview-frame">
         <div className="content">
           <div className="emoji"></div>

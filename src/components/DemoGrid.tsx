@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
-import type { ComponentType, MouseEvent, ReactNode } from "react";
+import type { MouseEvent, ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { MorphScroll } from "morphing-scroll";
 
@@ -31,14 +31,12 @@ type DemoGridProps = {
   demos: DemoItem[];
   bodyBg?: string;
   renderDemoContent?: (pageName: string) => ReactNode;
-  notFoundComponent?: ComponentType | undefined;
 };
 
 const DemoGrid = memo(function DemoGrid({
   demos,
   bodyBg,
   renderDemoContent,
-  notFoundComponent: NotFoundComponent,
 }: DemoGridProps) {
   const activePage = nexus.use("activePage") || "";
   const darkTheme = Boolean(nexus.use("darkTheme"));
@@ -100,7 +98,7 @@ const DemoGrid = memo(function DemoGrid({
 
     warnDevelopment(
       `missing-demo:${activePage}`,
-      `demo "${activePage}" was not found in the generated registry.`,
+      `demo "${activePage}" was not found in the generated manifest.`,
     );
   }, [activeDemo, activePage]);
 

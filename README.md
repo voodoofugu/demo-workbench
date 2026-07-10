@@ -17,9 +17,9 @@
 
 It is designed for component libraries, visual experiments, scroll demos, style systems and project-specific UI sandboxes: places where you want a reusable demo shell without rebuilding the same grid, search, theme toggle, preview state and storage logic every time.
 
-It is not a full documentation system. It does not generate docs, parse MDX, run tests in the browser or replace Storybook. It gives a clean workbench shell plus a small compile step that discovers demo files and prepares the generated registry used by the shell.
+It is not a full documentation system. It does not generate docs, parse MDX, run tests in the browser or replace Storybook. It gives a clean workbench shell plus a small compile step that discovers demo files and prepares the generated manifest used by the shell.
 
-The core idea is simple - the package owns the workbench UI and generated registry, while the project owns the demo files and the import function that loads them.
+The core idea is simple - the package owns the workbench UI and generated manifest format, while the project owns the demo files and generated manifest file.
 
 <h2></h2>
 
@@ -48,7 +48,7 @@ Workbench shell styles are injected by the package automatically when `DemoWorkb
 
 > **✦ Package manager support:**
 >
-> `runWorkbenchCompile` writes the generated demo registry into the installed `demo-workbench` files inside `node_modules`. This works with **npm** (including `file:`/linked installs). It is not supported with **pnpm**, whose content-addressed store must not be mutated. Re-run the compile after `npm install`/package updates to restore the registry.
+> Generate a host-owned demo manifest with `demos.outputFile` and pass it to `<DemoWorkbench demos={demos} />`. This does not mutate `node_modules` and works with normal package-manager installs.
 
 <h2></h2>
 
@@ -64,12 +64,13 @@ Workbench shell styles are injected by the package automatically when `DemoWorkb
 
 ```tsx
 import DemoWorkbench from "demo-workbench";
+import demos from "./myDemos.js";
 
 export default function App() {
   return (
     <DemoWorkbench
       title="My Project Demos"
-      demoLoader={(name) => import(`./pages/${name}`)}
+      demos={demos}
       styleLoader={(name) => import(`../css/${name}.css`)}
       baseStyles={["output", "theme"]}
     />
@@ -79,7 +80,7 @@ export default function App() {
 
 <b>Description:</b><em><br />
 Renders the full workbench shell: header, search, theme toggle, scrollable demo grid, loading state, opened-demo modal and persisted workbench values.<br />
-The consuming project runs <code>runWorkbenchCompile</code> to generate demo names, then passes <code>demoLoader</code> so the shell can import each generated name on demand. In local development, serve the compiled style output directory as <code>/workbench-css/</code>; the workbench uses that path to load generated CSS and enable style reload while watch mode is running.
+The consuming project runs <code>runWorkbenchCompile</code> to generate a small demo manifest, then passes it through <code>demos</code> so the shell can import each demo on demand. In local development, serve the compiled style output directory as <code>/workbench-css/</code>; the workbench uses that path to load generated CSS and enable style reload while watch mode is running.
 </em><br />
 
 <b>Signature:</b><br />
@@ -91,14 +92,15 @@ function DemoWorkbench(props: DemoWorkbenchProps): JSX.Element;
 <b>Props:</b><br />
 
 - `title?: string` - shell title shown in the workbench header and document title.
-- `demoLoader: (name: string) => Promise<DemoModule>` - async loader for generated demo names.
+- `demos: DemoItem[]` - generated host-owned demo manifest.
 - `styleLoader?: (name: string) => Promise<unknown>` - dynamic style loader used by `styled-atom`.
 - `baseStyles?: string[]` - host-level CSS atoms loaded by the shell.
 - `baseCssFiles?: string[]` - deprecated alias for `baseStyles`.
 - `autoScale?: false | { width?: number | null; height?: number | null }` - optional opened-demo auto scale reference. Omit it to keep workbench auto scaling disabled.
 - `renderDemoContent?: (pageName: string) => ReactNode` - project layer rendered inside opened demos.
 - `bodyBg?: string` - background value for the opened demo body.
-- `notFoundComponent?: ComponentType` - fallback component for unknown demo pages during search.
+
+The workbench renders its own built-in placeholder when no demos are registered yet and when a search matches nothing — the host app no longer supplies a fallback component.
 
 <br />
 
@@ -129,11 +131,21 @@ runWorkbenchCompile({
     inputDir: "src/styles/scss",
     outputDir: "src/styles/workbench-css",
     assetUrlPrefix: "http://localhost:3000/img/",
-    clean: true,
   },
-  demos: { inputDir: "src/components/pages" },
+  demos: {
+    inputDir: "src/components/pages",
+    outputFile: "src/components/templateComponents/myDemos",
+  },
 });
 ```
+
+`demos.outputFile` is the project-owned manifest path without an extension. The last path segment is treated as the file name and the compiler writes a `.js` module next to it. For example `src/components/templateComponents/myDemos` becomes `src/components/templateComponents/myDemos.js`:
+
+```tsx
+import demos from "./myDemos.js";
+```
+
+Full style compiles clean `styles.outputDir` by default so removed source styles do not leave stale CSS behind. Pass `clean: false` only when that output directory intentionally contains files managed outside `demo-workbench`.
 
 Run it as a command:
 
@@ -173,7 +185,7 @@ runWorkbenchCompile({
 ```
 
 <b>Description:</b><em><br />
-This is the main Node entry point for host projects. It reads <code>process.argv</code>, runs one compile by default, and switches to watch mode for <code>--watch</code> or <code>watch</code>. It generates the demo registry, compiles project CSS, starts watch mode, enables style reload, handles <code>SIGINT</code>/<code>SIGTERM</code> cleanup, and prints compact CLI-style logs.
+This is the main Node entry point for host projects. It reads <code>process.argv</code>, runs one compile by default, and switches to watch mode for <code>--watch</code> or <code>watch</code>. It generates the demo manifest, compiles project CSS, starts watch mode, enables style reload, handles <code>SIGINT</code>/<code>SIGTERM</code> cleanup, and prints compact CLI-style logs.
 </em><br />
 
 ```text
@@ -202,16 +214,16 @@ function runWorkbenchCompile(
 
 ```tsx
 // Default behavior: no workbench auto scale.
-<DemoWorkbench />
+<DemoWorkbench demos={demos} />
 
 // Fixed game/screen workspace.
-<DemoWorkbench autoScale={{ width: 1200, height: 640 }} />
+<DemoWorkbench demos={demos} autoScale={{ width: 1200, height: 640 }} />
 
 // Scale by width only; the demo owns its height responsiveness.
-<DemoWorkbench autoScale={{ width: 1200, height: null }} />
+<DemoWorkbench demos={demos} autoScale={{ width: 1200, height: null }} />
 
 // Explicit no-op, useful when autoScale is toggled from config.
-<DemoWorkbench autoScale={false} />
+<DemoWorkbench demos={demos} autoScale={false} />
 ```
 
 </div></ul></details>

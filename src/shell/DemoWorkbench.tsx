@@ -11,16 +11,13 @@ import {
   workbenchStyleAtoms,
 } from "../styles/styledAtom";
 import workbenchStyles from "../styles/workbenchStyles";
-import WorkbenchStorage from "../state/WorkbenchStorage";
-import generatedWorkbenchRegistry from "../state/generatedWorkbenchRegistry";
-import { defaultStorageData } from "../state/nexus";
 import { WorkbenchHostCssFilesProvider } from "../state/WorkbenchHostCssFilesContext";
 import { warnDevelopment } from "../utils/devWarnings";
 import { useStableStringList } from "../hooks/useStableStringList";
 import WorkbenchShell from "./WorkbenchShell";
 import WorkbenchTitle from "./WorkbenchTitle";
 
-import type { DemoWorkbenchProps } from "../types/public";
+import type { DemoItem, DemoWorkbenchProps } from "../types/public";
 
 const emptyCssLoader = () => Promise.resolve();
 const DEFAULT_STYLE_RELOAD_MANIFEST_URL =
@@ -123,14 +120,14 @@ function warnMissingStyleLoader(fileNames: readonly string[]) {
 function warnInvalidDemoModule(name: string) {
   warnDevelopment(
     `invalid-demo-module:${name}`,
-    `demoLoader("${name}") returned a module without a default React component.`,
+    `demo "${name}" loaded a module without a default React component.`,
   );
 }
 
 function warnFailedDemoLoad(name: string, error: unknown) {
   warnDevelopment(
     `failed-demo-load:${name}`,
-    `demoLoader("${name}") failed.`,
+    `demo "${name}" failed to load.`,
     error,
   );
 }
@@ -148,12 +145,12 @@ function warnFailedStyleLoad(fileName: string, error: unknown) {
  * ### ***DemoWorkbench***:
  * searchable React shell for local component and screen demos.
  * @description
- * Renders the full reusable workbench UI: header, search, theme toggle, scrollable demo grid, loading state, opened-demo modal and persisted shell state. `runWorkbenchCompile` supplies the generated demo registry; the host project supplies a `demoLoader`, style loading and optional render hooks while `demo-workbench` owns the repeated shell behavior. For local style reload, serve the compiled style output directory as `/workbench-css/`.
+ * Renders the full reusable workbench UI: header, search, theme toggle, scrollable demo grid, loading state, opened-demo modal and persisted shell state. `runWorkbenchCompile` can generate a host-owned demo manifest; the host project supplies demos, style loading and optional render hooks while `demo-workbench` owns the repeated shell behavior. For local style reload, serve the compiled style output directory as `/workbench-css/`.
  * @example
  * ```tsx
  * <DemoWorkbench
  *   title="Project demos"
- *   demoLoader={(name) => import(`./pages/${name}`)}
+ *   demos={demos}
  *   styleLoader={(name) => import(`./workbench-css/${name}.css`)}
  *   baseStyles={["output", "theme"]}
  * />
@@ -161,14 +158,13 @@ function warnFailedStyleLoad(fileName: string, error: unknown) {
  */
 export default function DemoWorkbench({
   title = "Demo Workbench",
-  demoLoader,
+  demos,
   styleLoader,
   baseStyles,
   baseCssFiles,
   autoScale,
   renderDemoContent,
   bodyBg,
-  notFoundComponent,
 }: DemoWorkbenchProps) {
   const resolvedStyleLoader: (name: string) => Promise<unknown> =
     styleLoader ?? emptyCssLoader;
@@ -296,41 +292,37 @@ export default function DemoWorkbench({
     }
   }, [hostCssFiles, styleLoader]);
 
-  const registryDemos = useMemo(
-    () =>
-      generatedWorkbenchRegistry.demos.map((name) => ({
-        name,
-        load: async () => {
-          try {
-            const module = await demoLoader(name);
+  const manifestDemos = useMemo<DemoItem[]>(() => {
+    return demos.map((demo) => ({
+      ...demo,
+      load: async () => {
+        try {
+          const module = await demo.load();
 
-            if (!module?.default) {
-              warnInvalidDemoModule(name);
-            }
-
-            return module;
-          } catch (error) {
-            warnFailedDemoLoad(name, error);
-            throw error;
+          if (!module?.default) {
+            warnInvalidDemoModule(demo.name);
           }
-        },
-      })),
-    [demoLoader],
-  );
+
+          return module;
+        } catch (error) {
+          warnFailedDemoLoad(demo.name, error);
+          throw error;
+        }
+      },
+    }));
+  }, [demos]);
 
   return (
     <StyledAtom name="demo-workbench" encap styles={workbenchStyles}>
       <WorkbenchHostCssFilesProvider files={hostCssFiles}>
         <WorkbenchGlobalStyles hostFileNames={hostCssFiles} />
         <WorkbenchTitle title={title} />
-        <WorkbenchStorage storageData={defaultStorageData} />
         <WorkbenchShell
           title={title}
-          demos={registryDemos}
+          demos={manifestDemos}
           autoScale={autoScale}
           renderDemoContent={renderDemoContent}
           bodyBg={bodyBg}
-          notFoundComponent={notFoundComponent}
         />
       </WorkbenchHostCssFilesProvider>
     </StyledAtom>

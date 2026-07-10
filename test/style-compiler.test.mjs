@@ -17,23 +17,6 @@ async function withTempDir(fn) {
   }
 }
 
-async function readOptionalFile(filePath) {
-  try {
-    return await readFile(filePath, "utf8");
-  } catch {
-    return null;
-  }
-}
-
-async function restoreFileSnapshot({ filePath, content }) {
-  if (content === null) {
-    await rm(filePath, { force: true });
-    return;
-  }
-
-  await writeFile(filePath, content);
-}
-
 async function captureConsoleLog(fn) {
   const messages = [];
   const originalLog = console.log;
@@ -217,6 +200,50 @@ test("runWorkbenchCompile can emit production css without workbench isolation", 
   });
 });
 
+test("runWorkbenchCompile cleans stale style output on full compile by default", async () => {
+  await withTempDir(async (dir) => {
+    const inputDir = path.join(dir, "input");
+    const outputDir = path.join(dir, "output");
+    await mkdir(inputDir, { recursive: true });
+    await mkdir(outputDir, { recursive: true });
+    await writeFile(path.join(inputDir, "fresh.scss"), `.fresh { color: blue; }\n`);
+    await writeFile(path.join(outputDir, "stale.css"), `.stale { color: red; }\n`);
+
+    await compileWorkbenchForTest({
+      styles: { inputDir, outputDir },
+    });
+
+    await assert.rejects(
+      readFile(path.join(outputDir, "stale.css"), "utf8"),
+      /ENOENT/,
+    );
+    assert.match(
+      await readFile(path.join(outputDir, "fresh.css"), "utf8"),
+      /fresh/,
+    );
+  });
+});
+
+test("runWorkbenchCompile can preserve existing style output when clean is false", async () => {
+  await withTempDir(async (dir) => {
+    const inputDir = path.join(dir, "input");
+    const outputDir = path.join(dir, "output");
+    await mkdir(inputDir, { recursive: true });
+    await mkdir(outputDir, { recursive: true });
+    await writeFile(path.join(inputDir, "fresh.scss"), `.fresh { color: blue; }\n`);
+    await writeFile(path.join(outputDir, "kept.css"), `.kept { color: red; }\n`);
+
+    await compileWorkbenchForTest({
+      styles: { inputDir, outputDir, clean: false },
+    });
+
+    assert.match(
+      await readFile(path.join(outputDir, "kept.css"), "utf8"),
+      /kept/,
+    );
+  });
+});
+
 test("runWorkbenchCompile always prints command progress", async () => {
   await withTempDir(async (dir) => {
     const inputDir = path.join(dir, "input");
@@ -347,99 +374,159 @@ test("runWorkbenchCompile switches to watch mode from args", async () => {
 });
 
 test("runWorkbenchCompile returns section-shaped styles and demos results", async () => {
-  const registryFiles = [
-    path.join(process.cwd(), "src/state/generatedWorkbenchRegistry.ts"),
-    path.join(process.cwd(), "dist/index.js"),
-    path.join(process.cwd(), "dist/index.cjs"),
-  ];
-  const originalRegistryFiles = await Promise.all(
-    registryFiles.map(async (filePath) => ({
-      filePath,
-      content: await readOptionalFile(filePath),
-    })),
-  );
+  await withTempDir(async (dir) => {
+    const styleInputDir = path.join(dir, "styles");
+    const styleOutputDir = path.join(dir, "output");
+    const demoInputDir = path.join(dir, "demos");
+    const demoManifestFile = path.join(dir, "generated", "demos");
+    const generatedDemoManifestFile = path.join(dir, "generated", "demos.js");
+    await mkdir(styleInputDir, { recursive: true });
+    await mkdir(demoInputDir, { recursive: true });
+    await writeFile(
+      path.join(styleInputDir, "one.scss"),
+      `.item { color: blue; }\n`,
+    );
+    await writeFile(
+      path.join(demoInputDir, "AlphaDemo.tsx"),
+      `export default function AlphaDemo() { return null; }\n`,
+    );
 
-  try {
-    await withTempDir(async (dir) => {
-      const styleInputDir = path.join(dir, "styles");
-      const styleOutputDir = path.join(dir, "output");
-      const demoInputDir = path.join(dir, "demos");
-      await mkdir(styleInputDir, { recursive: true });
-      await mkdir(demoInputDir, { recursive: true });
-      await writeFile(
-        path.join(styleInputDir, "one.scss"),
-        `.item { color: blue; }\n`,
-      );
-      await writeFile(
-        path.join(demoInputDir, "AlphaDemo.tsx"),
-        `export default function AlphaDemo() { return null; }\n`,
-      );
-
-      const result = await compileWorkbenchForTest({
-        styles: {
-          inputDir: styleInputDir,
-          outputDir: styleOutputDir,
-        },
-        demos: { inputDir: demoInputDir },
-      });
-
-      assert.deepEqual(Object.keys(result).sort(), ["demos", "styles"]);
-      assert.deepEqual(
-        result.styles.files.map((file) => file.outputFile),
-        ["one.css"],
-      );
-      assert.deepEqual(result.demos.names, ["AlphaDemo"]);
-      assert.ok(
-        result.demos.outputFiles.some((file) =>
-          file.endsWith("src/state/generatedWorkbenchRegistry.ts"),
-        ),
-      );
-      assert.ok(
-        result.demos.outputFiles.some((file) => file.endsWith("dist/index.js")),
-      );
-      assert.ok(
-        result.demos.outputFiles.some((file) =>
-          file.endsWith("dist/index.cjs"),
-        ),
-      );
-      assert.equal("fileRegistry" in result, false);
+    const result = await compileWorkbenchForTest({
+      styles: {
+        inputDir: styleInputDir,
+        outputDir: styleOutputDir,
+      },
+      demos: {
+        inputDir: demoInputDir,
+        outputFile: demoManifestFile,
+      },
     });
-  } finally {
-    await Promise.all(originalRegistryFiles.map(restoreFileSnapshot));
-  }
+
+    assert.deepEqual(Object.keys(result).sort(), ["demos", "styles"]);
+    assert.deepEqual(
+      result.styles.files.map((file) => file.outputFile),
+      ["one.css"],
+    );
+    assert.deepEqual(result.demos.names, ["AlphaDemo"]);
+    assert.deepEqual(result.demos.outputFiles, [generatedDemoManifestFile]);
+    assert.match(
+      await readFile(generatedDemoManifestFile, "utf8"),
+      /export const demos = \[[\s\S]*name: "AlphaDemo"[\s\S]*load: \(\) => import\("\.\.\/demos\/AlphaDemo\.tsx"\)/,
+    );
+    assert.equal("fileRegistry" in result, false);
+  });
 });
 
 test("runWorkbenchCompile discovers sorted module basenames", async () => {
-  const registryFiles = [
-    path.join(process.cwd(), "src/state/generatedWorkbenchRegistry.ts"),
-    path.join(process.cwd(), "dist/index.js"),
-    path.join(process.cwd(), "dist/index.cjs"),
-  ];
-  const originalRegistryFiles = await Promise.all(
-    registryFiles.map(async (filePath) => ({
-      filePath,
-      content: await readOptionalFile(filePath),
-    })),
-  );
+  await withTempDir(async (dir) => {
+    const manifestFile = path.join(dir, "generated", "demos.generated");
+    await writeFile(path.join(dir, "Beta.tsx"), `export default null;\n`);
+    await writeFile(path.join(dir, "Alpha.jsx"), `export default null;\n`);
+    await writeFile(path.join(dir, "notes.md"), `# ignored\n`);
+    await writeFile(path.join(dir, "_Private.tsx"), `export default null;\n`);
+    await writeFile(path.join(dir, "a_popupList.json"), `[]\n`);
+    await writeFile(path.join(dir, "Types.d.ts"), `export type T = string;\n`);
 
-  try {
-    await withTempDir(async (dir) => {
-      await writeFile(path.join(dir, "Beta.tsx"), `export default null;\n`);
-      await writeFile(path.join(dir, "Alpha.jsx"), `export default null;\n`);
-      await writeFile(path.join(dir, "notes.md"), `# ignored\n`);
-      await writeFile(path.join(dir, "_Private.tsx"), `export default null;\n`);
-      await writeFile(path.join(dir, "a_popupList.json"), `[]\n`);
-      await writeFile(path.join(dir, "Types.d.ts"), `export type T = string;\n`);
-
-      const result = await compileWorkbenchForTest({
-        demos: { inputDir: dir },
-      });
-
-      assert.deepEqual(result.demos.names, ["Alpha", "Beta"]);
+    const result = await compileWorkbenchForTest({
+      demos: { inputDir: dir, outputFile: manifestFile },
     });
-  } finally {
-    await Promise.all(originalRegistryFiles.map(restoreFileSnapshot));
-  }
+
+    assert.deepEqual(result.demos.names, ["Alpha", "Beta"]);
+    assert.deepEqual(result.demos.outputFiles, [
+      path.join(dir, "generated", "demos.generated.js"),
+    ]);
+  });
+});
+
+test("runWorkbenchCompile treats demos.outputFile as a js manifest basename", async () => {
+  await withTempDir(async (dir) => {
+    const inputDir = path.join(dir, "pages");
+    const outputFile = path.join(dir, "src", "components", "templateComponents", "myDemos");
+    const generatedOutputFile = `${outputFile}.js`;
+    await mkdir(inputDir, { recursive: true });
+    await writeFile(path.join(inputDir, "Dashboard.tsx"), `export default null;\n`);
+
+    const result = await compileWorkbenchForTest({
+      demos: { inputDir, outputFile },
+    });
+
+    assert.deepEqual(result.demos.outputFiles, [generatedOutputFile]);
+    assert.match(
+      await readFile(generatedOutputFile, "utf8"),
+      /export default demos;/,
+    );
+  });
+});
+
+test("runWorkbenchCompile rejects invalid demo manifest output paths", async () => {
+  await withTempDir(async (dir) => {
+    const inputDir = path.join(dir, "pages");
+    await mkdir(inputDir, { recursive: true });
+    await writeFile(path.join(inputDir, "Dashboard.tsx"), `export default null;\n`);
+
+    const messages = await captureConsoleMessages(async () => {
+      try {
+        const emptyResult = await runWorkbenchCompile({
+          args: [],
+          demos: { inputDir, outputFile: "" },
+        });
+        const directoryResult = await runWorkbenchCompile({
+          args: [],
+          demos: {
+            inputDir,
+            outputFile: `${path.join(dir, "generated")}${path.sep}`,
+          },
+        });
+
+        assert.equal(emptyResult, undefined);
+        assert.equal(directoryResult, undefined);
+      } finally {
+        process.exitCode = undefined;
+      }
+    });
+
+    assert.ok(
+      messages.error.some((message) =>
+        /demos\.outputFile is required/.test(message),
+      ),
+    );
+    assert.ok(
+      messages.error.some((message) =>
+        /demos\.outputFile must include a file name/.test(message),
+      ),
+    );
+  });
+});
+
+test("runWorkbenchCompile rejects duplicate demo basenames", async () => {
+  await withTempDir(async (dir) => {
+    const inputDir = path.join(dir, "pages");
+    await mkdir(inputDir, { recursive: true });
+    await writeFile(path.join(inputDir, "Dashboard.tsx"), `export default null;\n`);
+    await writeFile(path.join(inputDir, "Dashboard.jsx"), `export default null;\n`);
+
+    const messages = await captureConsoleMessages(async () => {
+      try {
+        const result = await runWorkbenchCompile({
+          args: [],
+          demos: {
+            inputDir,
+            outputFile: path.join(dir, "generated", "myDemos"),
+          },
+        });
+
+        assert.equal(result, undefined);
+      } finally {
+        process.exitCode = undefined;
+      }
+    });
+
+    assert.ok(
+      messages.error.some((message) =>
+        /Duplicate demo basename "Dashboard"/.test(message),
+      ),
+    );
+  });
 });
 
 function waitForBuild(builds, count) {
@@ -512,79 +599,56 @@ test("runWorkbenchCompile watch mode recompiles only the changed top-level style
   });
 });
 
-test("runWorkbenchCompile watch mode rebuilds demo registry only when demo file names change", async () => {
-  const registryFiles = [
-    path.join(process.cwd(), "src/state/generatedWorkbenchRegistry.ts"),
-    path.join(process.cwd(), "dist/index.js"),
-    path.join(process.cwd(), "dist/index.cjs"),
-  ];
-  const originalRegistryFiles = await Promise.all(
-    registryFiles.map(async (filePath) => ({
-      filePath,
-      content: await readOptionalFile(filePath),
-    })),
-  );
+test("runWorkbenchCompile watch mode rebuilds demo manifest only when demo file names change", async () => {
+  await withTempDir(async (dir) => {
+    const demoInputDir = path.join(dir, "demos");
+    const demoManifestFile = path.join(dir, "generated", "demos");
+    await mkdir(demoInputDir, { recursive: true });
+    await writeFile(
+      path.join(demoInputDir, "AlphaDemo.tsx"),
+      `export default function AlphaDemo() { return null; }\n`,
+    );
 
-  try {
-    await withTempDir(async (dir) => {
-      const demoInputDir = path.join(dir, "demos");
-      await mkdir(demoInputDir, { recursive: true });
-      await writeFile(
-        path.join(demoInputDir, "AlphaDemo.tsx"),
-        `export default function AlphaDemo() { return null; }\n`,
-      );
-
-      const builds = [];
-      builds.waiters = [];
-      await captureConsoleLog(async (messages) => {
-        const watch = await watchWorkbenchForTest({
-          demos: { inputDir: demoInputDir },
-          debounceMs: 20,
-          onBuild: (result) => {
-            builds.push(result);
-            for (const waiter of builds.waiters.splice(0)) waiter();
-          },
-        });
-
-        try {
-          await new Promise((resolve) => watch.watcher.once("ready", resolve));
-          assert.deepEqual(builds[0].demos.names, ["AlphaDemo"]);
-          assert.ok(messages.includes("✓ demos discovered (1)"));
-
-          await writeFile(
-            path.join(demoInputDir, "AlphaDemo.tsx"),
-            `export default function AlphaDemo() { return "changed"; }\n`,
-          );
-          await waitForNoBuild(builds);
-
-          await writeFile(
-            path.join(demoInputDir, "BetaDemo.tsx"),
-            `export default function BetaDemo() { return null; }\n`,
-          );
-          await waitForBuild(builds, 2);
-          assert.deepEqual(builds[1].demos.names, ["AlphaDemo", "BetaDemo"]);
-          assert.ok(
-            messages.includes(
-              '✓ pages added (1): "BetaDemo"',
-            ),
-          );
-
-          await rm(path.join(demoInputDir, "BetaDemo.tsx"), { force: true });
-          await waitForBuild(builds, 3);
-          assert.deepEqual(builds[2].demos.names, ["AlphaDemo"]);
-          assert.ok(
-            messages.includes(
-              '✓ pages removed (1): "BetaDemo"',
-            ),
-          );
-        } finally {
-          await watch.close();
-        }
+    const builds = [];
+    builds.waiters = [];
+    await captureConsoleLog(async (messages) => {
+      const watch = await watchWorkbenchForTest({
+        demos: { inputDir: demoInputDir, outputFile: demoManifestFile },
+        debounceMs: 20,
+        onBuild: (result) => {
+          builds.push(result);
+          for (const waiter of builds.waiters.splice(0)) waiter();
+        },
       });
+
+      try {
+        await new Promise((resolve) => watch.watcher.once("ready", resolve));
+        assert.deepEqual(builds[0].demos.names, ["AlphaDemo"]);
+        assert.ok(messages.includes("✓ demos discovered (1)"));
+
+        await writeFile(
+          path.join(demoInputDir, "AlphaDemo.tsx"),
+          `export default function AlphaDemo() { return "changed"; }\n`,
+        );
+        await waitForNoBuild(builds);
+
+        await writeFile(
+          path.join(demoInputDir, "BetaDemo.tsx"),
+          `export default function BetaDemo() { return null; }\n`,
+        );
+        await waitForBuild(builds, 2);
+        assert.deepEqual(builds[1].demos.names, ["AlphaDemo", "BetaDemo"]);
+        assert.ok(messages.includes('✓ pages added (1): "BetaDemo"'));
+
+        await rm(path.join(demoInputDir, "BetaDemo.tsx"), { force: true });
+        await waitForBuild(builds, 3);
+        assert.deepEqual(builds[2].demos.names, ["AlphaDemo"]);
+        assert.ok(messages.includes('✓ pages removed (1): "BetaDemo"'));
+      } finally {
+        await watch.close();
+      }
     });
-  } finally {
-    await Promise.all(originalRegistryFiles.map(restoreFileSnapshot));
-  }
+  });
 });
 
 test("runWorkbenchCompile watch mode serves fresh css through the style reload endpoint", async () => {

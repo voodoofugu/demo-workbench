@@ -2,8 +2,8 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 
 import DemoWorkbench from "../src";
-import generatedWorkbenchRegistry from "../src/state/generatedWorkbenchRegistry";
 import { AlphaExample, BetaExample } from "../examples";
+import type { DemoItem, DemoModule } from "../src";
 
 import alphaCss from "../examples/styles/alpha.css?raw";
 import betaCss from "../examples/styles/beta.css?raw";
@@ -25,7 +25,7 @@ function styleLoader(name: string) {
   return Promise.resolve({ default: css });
 }
 
-const demoModules = {
+const demoModules: Record<string, DemoModule> = {
   "Alpha example": {
     default: AlphaExample,
     cssFiles: ["examples/alpha.css"],
@@ -92,12 +92,7 @@ const demoModules = {
   },
 };
 
-// In host projects `runWorkbenchCompile` writes demo names into the generated
-// registry; the dev sandbox registers its example demos the same way.
-// generatedWorkbenchRegistry.demos = [];
-generatedWorkbenchRegistry.demos.push(...Object.keys(demoModules));
-
-function demoLoader(name: string) {
+function loadDemo(name: string) {
   const demo = demoModules[name as keyof typeof demoModules];
 
   if (!demo) {
@@ -107,11 +102,16 @@ function demoLoader(name: string) {
   return Promise.resolve(demo);
 }
 
+const demos: DemoItem[] = Object.keys(demoModules).map((name) => ({
+  name,
+  load: () => loadDemo(name),
+}));
+
 function App() {
   return (
     <DemoWorkbench
       title="demo-workbench dev"
-      demoLoader={demoLoader}
+      demos={demos}
       styleLoader={styleLoader}
       baseStyles={["output"]}
       renderDemoContent={(pageName) => (

@@ -1,5 +1,4 @@
 import { memo, useEffect, useRef } from "react";
-import type { ComponentType } from "react";
 
 import WorkbenchLayout from "./WorkbenchLayout";
 import DemoGrid from "../components/DemoGrid";
@@ -18,7 +17,6 @@ type WorkbenchShellProps = {
   autoScale?: DemoWorkbenchAutoScale;
   renderDemoContent?: DemoWorkbenchProps["renderDemoContent"];
   bodyBg?: DemoWorkbenchProps["bodyBg"];
-  notFoundComponent?: ComponentType | undefined;
 };
 
 function getScaleForAxis(availableSize: number, referenceSize?: number | null) {
@@ -38,7 +36,6 @@ export default memo(function WorkbenchShell({
   autoScale,
   renderDemoContent,
   bodyBg,
-  notFoundComponent,
 }: WorkbenchShellProps) {
   const theme = nexus.use("darkTheme") as boolean;
   const themeColor = nexus.use("themeColor") as string;
@@ -85,7 +82,6 @@ export default memo(function WorkbenchShell({
           demos={demos}
           renderDemoContent={renderDemoContent}
           bodyBg={bodyBg}
-          notFoundComponent={notFoundComponent}
         />
       </WorkbenchLayout>
     </div>

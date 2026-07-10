@@ -39,7 +39,6 @@ const createMinify = ({ dropConsole = true } = {}) =>
     },
     mangle: {
       toplevel: true,
-      reserved: ["generatedWorkbenchRegistry"],
     },
     output: {
       comments: false,
