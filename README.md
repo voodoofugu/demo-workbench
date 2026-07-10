@@ -58,17 +58,20 @@ Workbench shell styles are injected by the package automatically when `DemoWorkb
 
 **1. Write a compile script.** It generates the demo manifest and compiles your project CSS into scoped, workbench-ready files:
 
-```ts
-// scripts/workbenchCompile.ts
+```js
+// scripts/workbenchCompile.js
 import { runWorkbenchCompile } from "demo-workbench/node";
 
 runWorkbenchCompile({
-  styles: { inputDir: "src/styles/scss", outputDir: "src/styles/workbench-css" },
+  styles: {
+    inputDir: "src/styles/scss",
+    outputDir: "src/styles/workbench-css",
+  },
   demos: { inputDir: "src/screens", outputFile: "src/screens/demos" },
 });
 ```
 
-Run it once with `ts-node scripts/workbenchCompile.ts`, or add `--watch` in development. Serve `styles.outputDir` at `/workbench-css/`.
+Run it once with `node scripts/workbenchCompile.js`, or add `--watch` in development. Serve `styles.outputDir` at `/workbench-css/`.
 
 **2. Render the shell** with the generated manifest and a `styleLoader`:
 
@@ -90,7 +93,7 @@ export default function App() {
 
 That's it: the package owns the shell; your project owns the screens and styles.
 
-<details id="demo-css"><summary><b>✦ Demo CSS</b></summary><br /><ul><div>
+<details id="demo-css"><summary><b>Demo CSS</b></summary><br /><ul><div>
 
 A demo declares its scoped CSS by exporting `cssFiles` next to the component. Values are compiled file names from `styles.outputDir`, without `.css`:
 
@@ -107,7 +110,7 @@ Use `baseStyles` for shell-wide CSS such as reset, tokens or keyframes. Omit `cs
 
 </div></ul></details>
 
-<details id="demo-component"><summary><b>✦ Demo component props</b></summary><br /><ul><div>
+<details id="demo-component"><summary><b>Demo component props</b></summary><br /><ul><div>
 
 A demo's default export is a normal React component. The workbench renders it in grid and opened modes, and passes `DemoComponentProps`:
 
@@ -161,12 +164,6 @@ Renders the header, search, theme controls, demo grid, opened-demo modal and per
 Pass the generated <code>demos</code> manifest and an optional <code>styleLoader</code>.
 </em><br />
 
-<b>Signature:</b><br />
-
-```ts
-function DemoWorkbench(props: DemoWorkbenchProps): JSX.Element;
-```
-
 <b>Props:</b><br />
 
 - `title?: string` - shell title shown in the workbench header and document title.
@@ -198,7 +195,7 @@ Returns a React element containing the complete reusable workbench shell.
 
 <b>Usage:</b><br />
 
-```ts
+```js
 import { runWorkbenchCompile } from "demo-workbench/node";
 
 runWorkbenchCompile({
@@ -229,18 +226,18 @@ Run it as a command:
 ###### **— one launch —**
 
 ```bash
-ts-node src/scripts/workbenchCompile.ts
+node src/scripts/workbenchCompile.js
 ```
 
 ###### **— watch mode —**
 
 ```bash
-ts-node src/scripts/workbenchCompile.ts --watch
+node src/scripts/workbenchCompile.js --watch
 ```
 
 The host builder/dev-server must expose `styles.outputDir` at `/workbench-css/`:
 
-```ts
+```js
 // webpack-dev-server example
 static: [
   {
@@ -253,7 +250,7 @@ static: [
 
 CLI progress is always printed. Pass `styleLogs: false` to hide Sass/CSS compiler output:
 
-```ts
+```js
 runWorkbenchCompile({
   styles: {...},
   demos: {...},
@@ -271,14 +268,6 @@ Main Node entry for host scripts. It runs one compile by default and switches to
 ✓ styles compiled (12)
 ✓ demos discovered (54)
 ✓ style reload enabled
-```
-
-<b>Signature:</b><br />
-
-```ts
-function runWorkbenchCompile(
-  options: WorkbenchCompileCommandOptions,
-): Promise<WorkbenchCompileResult | WorkbenchCompileWatchResult | undefined>;
 ```
 
 </div></ul></details>
