@@ -9,4 +9,5 @@ export type {
   DemoWorkbenchAutoScaleDimension,
   DemoWorkbenchAutoScaleOptions,
   DemoWorkbenchProps,
+  DemoWorkbenchStyleLoader,
 } from "./types/public";

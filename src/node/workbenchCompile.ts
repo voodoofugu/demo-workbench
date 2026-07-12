@@ -98,9 +98,15 @@ export type WorkbenchCompileStylesOptions = {
    */
   outputDir: string;
   /**
-   * Workbench CSS mode.
+   * Workbench CSS mode. Toggles all workbench-integration behavior at once.
    * @description
-   * When `true`, selectors are scoped for demo previews and a sourceURL is appended for DevTools. Pass `false` only when you want minimal production-style CSS output.
+   * When `true` (default) the compiler produces CSS made for the workbench:
+   * selectors are scoped under the preview isolation selector, a `sourceURL`
+   * comment is appended for DevTools, and the dev style-reload manifest
+   * (`demo-workbench-style-reload.json`) is written next to the output. Pass
+   * `false` for plain production-style CSS: no scoping, no sourceURL, and no
+   * reload manifest (so a project compiling non-workbench CSS to this directory
+   * doesn't ship a stray workbench artifact).
    * @default true
    */
   compileForWorkbench?: boolean;
@@ -768,6 +774,15 @@ function shouldCompileForWorkbench(
   return options.compileForWorkbench !== false;
 }
 
+// The dev style-reload manifest is a workbench-only artifact, so it is written
+// only when compiling for the workbench. Plain production CSS leaves no manifest
+// behind.
+function shouldWriteStyleReloadManifest(
+  styles?: Pick<WorkbenchCompileStylesOptions, "compileForWorkbench">,
+) {
+  return Boolean(styles && shouldCompileForWorkbench(styles));
+}
+
 function appendStyleSourceUrl(css: Uint8Array, outputFile: string) {
   const cssText = Buffer.from(css).toString().trimEnd();
   const sourceUrl = `/*# sourceURL=${encodeURI(outputFile)} */`;
@@ -1137,7 +1152,7 @@ async function compileWorkbench(
   const styles = options.styles
     ? await compileStyles(options.styles, styleLogs)
     : undefined;
-  if (styles) {
+  if (styles && shouldWriteStyleReloadManifest(options.styles)) {
     await writeStyleReloadManifest(styles.outputDir, { enabled: false });
   }
   const manifest = await compileGeneratedManifest(options);
@@ -1479,7 +1494,10 @@ async function watchWorkbenchCompile(
     if (result.styles) {
       await styleReloadServer?.update(result.styles.files);
 
-      if (styleReloadServer) {
+      if (
+        styleReloadServer &&
+        shouldWriteStyleReloadManifest(compileOptions.styles)
+      ) {
         await writeStyleReloadManifest(result.styles.outputDir, {
           enabled: true,
           styleReloadUrl: styleReloadServer.url,
@@ -1567,8 +1585,8 @@ async function watchWorkbenchCompile(
         pendingEvents = [];
       }
 
-      if (compileOptions.styles) {
-        await writeStyleReloadManifest(compileOptions.styles.outputDir, {
+      if (shouldWriteStyleReloadManifest(compileOptions.styles)) {
+        await writeStyleReloadManifest(compileOptions.styles!.outputDir, {
           enabled: false,
         });
       }

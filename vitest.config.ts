@@ -8,7 +8,7 @@ import react from "@vitejs/plugin-react";
 export default defineConfig({
   plugins: [react()],
   test: {
-    include: ["test/**/*.dom.test.tsx"],
+    include: ["test/**/*.dom.test.{ts,tsx}"],
     environment: "happy-dom",
   },
 });

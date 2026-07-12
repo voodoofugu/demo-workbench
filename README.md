@@ -71,7 +71,7 @@ runWorkbenchCompile({
 });
 ```
 
-Run it once with `node scripts/workbenchCompile.js`, or add `--watch` in development. Serve `styles.outputDir` at `/workbench-css/`.
+Run it once with `node scripts/workbenchCompile.js`, or add `--watch` in development. Serve `styles.outputDir` at `/workbench-css/` — that one served path powers both jobs: the string `styleLoader` fetches `${prefix}/${name}.css` from it, and in `--watch` mode the workbench reads a small reload manifest there to hot-swap changed styles. (No manifest is written when `styles.compileForWorkbench` is `false`.)
 
 **2. Render the shell** with the generated manifest and a `styleLoader`:
 
@@ -84,12 +84,33 @@ export default function App() {
     <DemoWorkbench
       title="My Project Demos"
       demos={demos}
-      styleLoader={(name) => import(`./styles/workbench-css/${name}.css`)}
+      styleLoader="/workbench-css/"
       baseStyles={["reset", "ui-elements", "keyframes-animations"]}
     />
   );
 }
 ```
+
+`styleLoader` supports two loading strategies:
+
+1. **URL prefix, recommended.** Serve `styles.outputDir` as static files and pass its public URL prefix:
+
+```tsx
+<DemoWorkbench demos={demos} styleLoader="/workbench-css/" />
+```
+
+`styleLoader="/workbench-css/"` loads `reset` as `/workbench-css/reset.css`. This is the simplest setup and does not require CSS loaders.
+
+2. **Custom function, advanced.** Use this when your app loads CSS from a CDN, needs auth, or your bundler is configured to import CSS as text:
+
+```tsx
+<DemoWorkbench
+  demos={demos}
+  styleLoader={(name) => import(`./workbench-css/${name}.css?raw`)}
+/>
+```
+
+A string `styleLoader` is a public URL prefix, not a filesystem path.
 
 That's it: the package owns the shell; your project owns the screens and styles.
 
@@ -152,7 +173,7 @@ export default function App() {
     <DemoWorkbench
       title="My Project Demos"
       demos={projectDemos}
-      styleLoader={(name) => import(`../css/${name}.css`)}
+      styleLoader="/workbench-css/"
       baseStyles={["output", "theme"]}
     />
   );
@@ -168,13 +189,17 @@ Pass the generated manifest and an optional <code>styleLoader</code>.
 
 - `title?: string` - shell title shown in the workbench header and document title.
 - `demos: DemoItem[]` - generated host-owned demo manifest.
-- `styleLoader?: (name: string) => Promise<unknown>` - dynamic style loader used by `styled-atom`.
+- `styleLoader?: string | ((name: string) => unknown | Promise<unknown>)` - URL prefix for static CSS files, or a custom CSS text loader.
 - `baseStyles?: string[]` - host-level CSS atoms loaded by the shell.
 - `autoScale?: false | { width?: number | null; height?: number | null }` - optional opened-demo auto scale reference.
 - `renderDemoContent?: (pageName: string) => ReactNode` - project layer rendered inside opened demos.
 - `bodyBg?: string` - background value for the opened demo body.
 
 The workbench renders its own empty/search placeholders.
+
+<br />
+
+Use `styleLoader="/workbench-css/"` when `styles.outputDir` is served as static files. Use a function only for custom loading or CSS-as-text bundler imports.
 
 <br />
 

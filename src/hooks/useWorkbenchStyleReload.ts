@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   ImportStyle,
   ImportStyleResult,
@@ -6,9 +6,10 @@ import type {
 } from "styled-atom";
 
 import { workbenchStyleAtoms } from "../styles/styledAtom";
+import type { DemoWorkbenchStyleLoader } from "../types/public";
 import { warnDevelopment } from "../utils/devWarnings";
+import { toStyleLoader } from "../utils/styleLoader";
 
-const emptyCssLoader = () => Promise.resolve();
 const DEFAULT_STYLE_RELOAD_MANIFEST_URL =
   "/workbench-css/demo-workbench-style-reload.json";
 const STYLE_RELOAD_MANIFEST_POLL_MS = 2000;
@@ -75,10 +76,21 @@ async function loadStyleReplacements(
   );
 }
 
-async function loadStyleReloadUrlFromManifest(manifestUrl: string) {
-  const response = await fetch(manifestUrl, { cache: "no-store" });
+// Reads the dev style-reload manifest. Return value is three-state:
+//   null       — no manifest at this path (404 / unreachable); stop probing.
+//   undefined  — manifest present but reload disabled.
+//   string     — reload enabled at this URL.
+async function readStyleReloadManifest(
+  manifestUrl: string,
+): Promise<string | undefined | null> {
+  let response: Response;
+  try {
+    response = await fetch(manifestUrl, { cache: "no-store" });
+  } catch {
+    return null;
+  }
 
-  if (!response.ok) return undefined;
+  if (!response.ok) return null;
 
   const manifest = (await response.json()) as {
     enabled?: unknown;
@@ -107,9 +119,12 @@ function warnFailedStyleLoad(fileName: string, error: unknown) {
  * previews. A no-op on non-local hosts and on the server.
  */
 export function useWorkbenchStyleReload(
-  styleLoader?: (name: string) => Promise<unknown>,
+  styleLoader?: DemoWorkbenchStyleLoader,
 ) {
-  const resolvedStyleLoader = styleLoader ?? emptyCssLoader;
+  const resolvedStyleLoader = useMemo(
+    () => toStyleLoader(styleLoader),
+    [styleLoader],
+  );
   const [manifestStyleReloadUrl, setManifestStyleReloadUrl] = useState<
     string | undefined
   >();
@@ -138,26 +153,28 @@ export function useWorkbenchStyleReload(
       window.location.href,
     ).toString();
 
-    const readManifest = () => {
-      loadStyleReloadUrlFromManifest(resolvedManifestUrl)
-        .then((nextUrl) => {
-          if (!isActive) return;
-          setManifestStyleReloadUrl((currentUrl) =>
-            currentUrl === nextUrl ? currentUrl : nextUrl,
-          );
-        })
-        .catch(() => {
-          if (isActive) {
-            setManifestStyleReloadUrl(undefined);
-          }
-        });
-    };
-
-    readManifest();
     const interval = window.setInterval(
       readManifest,
       STYLE_RELOAD_MANIFEST_POLL_MS,
     );
+
+    function readManifest() {
+      readStyleReloadManifest(resolvedManifestUrl).then((result) => {
+        if (!isActive) return;
+        if (result === null) {
+          // No reload manifest at this path — stop probing so a project that
+          // doesn't use the workbench style pipeline isn't spammed with 404s.
+          window.clearInterval(interval);
+          setManifestStyleReloadUrl(undefined);
+          return;
+        }
+        setManifestStyleReloadUrl((current) =>
+          current === result ? current : result,
+        );
+      });
+    }
+
+    readManifest();
 
     return () => {
       isActive = false;

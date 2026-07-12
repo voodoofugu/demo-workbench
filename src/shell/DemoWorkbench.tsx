@@ -53,7 +53,7 @@ function warnFailedDemoLoad(name: string, error: unknown) {
  * <DemoWorkbench
  *   title="Project demos"
  *   demos={demos}
- *   styleLoader={(name) => import(`./workbench-css/${name}.css`)}
+ *   styleLoader="/workbench-css/"
  *   baseStyles={["output", "theme"]}
  * />
  * ```

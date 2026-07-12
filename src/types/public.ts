@@ -111,6 +111,21 @@ export type DemoItem = {
 
 /**---
  * ## ![logo](https://github.com/voodoofugu/demo-workbench/raw/main/src/assets/demo-workbench-logo.png)
+ * ### ***DemoWorkbenchStyleLoader***:
+ * CSS loader used by the workbench style store.
+ * @description
+ * Pass a URL prefix string for the common static-file case, for example `"/workbench-css/"`. The workbench will fetch `${name}.css` from that prefix. Pass a function when the host project needs custom loading or a bundler configured to import CSS as text.
+ * @example
+ * ```tsx
+ * <DemoWorkbench styleLoader="/workbench-css/" demos={demos} />
+ * ```
+ */
+export type DemoWorkbenchStyleLoader =
+  | string
+  | ((name: string) => unknown | Promise<unknown>);
+
+/**---
+ * ## ![logo](https://github.com/voodoofugu/demo-workbench/raw/main/src/assets/demo-workbench-logo.png)
  * ### ***DemoWorkbenchAutoScaleDimension***:
  * one enabled or disabled auto-scale axis.
  * @description
@@ -171,7 +186,7 @@ export type DemoWorkbenchAutoScale = DemoWorkbenchAutoScaleOptions | false;
  * <DemoWorkbench
  *   title="Project demos"
  *   demos={demos}
- *   styleLoader={(name) => import(`./workbench-css/${name}.css`)}
+ *   styleLoader="/workbench-css/"
  *   baseStyles={["output", "theme"]}
  * />
  * ```
@@ -193,9 +208,9 @@ export type DemoWorkbenchProps = {
   /**
    * Dynamic CSS loader.
    * @description
-   * Called for `baseStyles` and for each demo module's `cssFiles`. Return a dynamic import, for example `(name) => import(\`./workbench-css/${name}.css\`)`.
+   * Use a URL prefix string for static CSS files, for example `"/workbench-css/"`. The workbench fetches `${name}.css` from that prefix. Pass a function only when the host needs custom loading or a bundler configured to import CSS as text.
    */
-  styleLoader?: (name: string) => Promise<unknown>;
+  styleLoader?: DemoWorkbenchStyleLoader;
   /**
    * Base CSS files for the host project.
    * @description

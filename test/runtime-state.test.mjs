@@ -183,6 +183,7 @@ test("DemoWorkbench keeps stable baseStyles and owns shell styles inline", async
     workbenchStyles,
     loading,
     styleReloadHook,
+    styleLoaderUtil,
   ] = await Promise.all([
     readFile(path.join(root, "src/types/public.ts"), "utf8"),
     readFile(path.join(root, "src/shell/DemoWorkbench.tsx"), "utf8"),
@@ -192,6 +193,7 @@ test("DemoWorkbench keeps stable baseStyles and owns shell styles inline", async
     readFile(path.join(root, "src/styles/workbenchStyles.ts"), "utf8"),
     readFile(path.join(root, "src/components/feedback/Loading.tsx"), "utf8"),
     readFile(path.join(root, "src/hooks/useWorkbenchStyleReload.ts"), "utf8"),
+    readFile(path.join(root, "src/utils/styleLoader.ts"), "utf8"),
   ]);
 
   assert.match(publicTypes, /baseStyles\?:\s*string\[\]/);
@@ -199,6 +201,11 @@ test("DemoWorkbench keeps stable baseStyles and owns shell styles inline", async
   assert.doesNotMatch(publicTypes, /baseCssFiles/);
   assert.match(publicTypes, /cssFiles\?:\s*string\[\]/);
   assert.match(publicTypes, /demos:\s*DemoItem\[\]/);
+  assert.match(
+    publicTypes,
+    /export type DemoWorkbenchStyleLoader =[\s\S]*\|\s*string[\s\S]*\|\s*\(\(name: string\) => unknown \| Promise<unknown>\);/,
+  );
+  assert.match(publicTypes, /styleLoader\?:\s*DemoWorkbenchStyleLoader/);
   assert.doesNotMatch(publicTypes, /demoLoader/);
   assert.doesNotMatch(publicTypes, /DemoWorkbenchDemoLoader/);
   assert.match(demoWorkbench, /\bdemos,/);
@@ -220,6 +227,11 @@ test("DemoWorkbench keeps stable baseStyles and owns shell styles inline", async
   // Style-reload orchestration lives in its own hook now; DemoWorkbench just calls it.
   assert.match(demoWorkbench, /useWorkbenchStyleReload\(styleLoader\)/);
   assert.match(styleReloadHook, /workbenchStyleAtoms\.configure\(loadStyle\)/);
+  // The two-form styleLoader resolution lives in its own util.
+  assert.match(styleReloadHook, /toStyleLoader\(styleLoader\)/);
+  assert.match(styleLoaderUtil, /export function toStyleLoader/);
+  assert.match(styleLoaderUtil, /loadStyleFromUrlPrefix/);
+  assert.match(styleLoaderUtil, /getStyleLoaderCssUrl/);
   assert.doesNotMatch(demoWorkbench, /layer="workbench"/);
   assert.doesNotMatch(demoWorkbench, /layer=\{baseCssLayer\}/);
   assert.doesNotMatch(demoWorkbench, /css=\{baseCss\}/);
@@ -269,7 +281,7 @@ test("DemoWorkbench keeps stable baseStyles and owns shell styles inline", async
   assert.doesNotMatch(loading, /normalizeStyledAtomStyles/);
   assert.doesNotMatch(workbenchStyles, /content:\s*'""'/);
   assert.doesNotMatch(loading, /content:\s*'""'/);
-  assert.match(styleReloadHook, /loadStyleReloadUrlFromManifest/);
+  assert.match(styleReloadHook, /readStyleReloadManifest/);
   assert.match(styleReloadHook, /DEFAULT_STYLE_RELOAD_MANIFEST_URL/);
   assert.match(styleReloadHook, /STYLE_RELOAD_MANIFEST_POLL_MS/);
   assert.match(

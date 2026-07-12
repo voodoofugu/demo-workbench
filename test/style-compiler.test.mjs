@@ -197,6 +197,11 @@ test("runWorkbenchCompile can emit production css without workbench isolation", 
     assert.match(css, /\.card\{color:#00f\}/);
     assert.doesNotMatch(css, /\[workbench-scope\]/);
     assert.doesNotMatch(css, /sourceURL=/);
+    // No dev style-reload manifest is left in a production-css output dir.
+    await assert.rejects(
+      readFile(path.join(outputDir, STYLE_RELOAD_MANIFEST_FILE), "utf8"),
+      { code: "ENOENT" },
+    );
   });
 });
 
