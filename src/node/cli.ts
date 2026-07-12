@@ -9,7 +9,6 @@ import type {
 type CliOptions = WorkbenchCompileStylesOptions & {
   watch?: boolean;
   styleReload?: boolean | WorkbenchStyleReloadOptions;
-  styleLogs?: boolean;
   demoInputDir?: string;
   demoOutputFile?: string;
 };
@@ -90,7 +89,7 @@ function parseArgs(args: string[]): CliOptions {
       : undefined,
     assetUrlPrefix: readFlag(args, ["--asset-url-prefix", "--assetUrlPrefix"]),
     clean: hasFlag(args, ["--no-clean"]) ? false : undefined,
-    styleLogs: hasFlag(args, ["--no-style-logs", "--silent-styles"])
+    logs: hasFlag(args, ["--no-style-logs", "--silent-styles"])
       ? false
       : undefined,
     watch: args[0] === "watch" || hasFlag(args, ["--watch"]),
@@ -116,9 +115,9 @@ function toCompileOptions(options: CliOptions): WorkbenchCompileOptions {
       compileForWorkbench: options.compileForWorkbench,
       assetUrlPrefix: options.assetUrlPrefix,
       clean: options.clean,
+      logs: options.logs,
     },
     demos,
-    styleLogs: options.styleLogs,
   };
 }
 

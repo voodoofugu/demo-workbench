@@ -145,13 +145,13 @@ export default function GuardianChestsWindow({ isActive, children }) {
 
 ```tsx
 import DemoWorkbench from "demo-workbench";
-import demos from "./myDemos.js";
+import myDemos from "./myDemos.js";
 
 export default function App() {
   return (
     <DemoWorkbench
       title="My Project Demos"
-      demos={demos}
+      demos={myDemos}
       styleLoader={(name) => import(`../css/${name}.css`)}
       baseStyles={["output", "theme"]}
     />
@@ -161,7 +161,7 @@ export default function App() {
 
 <b>Description:</b><em><br />
 Renders the header, search, theme controls, demo grid, opened-demo modal and persisted workbench state.<br />
-Pass the generated <code>demos</code> manifest and an optional <code>styleLoader</code>.
+Pass the generated manifest and an optional <code>styleLoader</code>.
 </em><br />
 
 <b>Props:</b><br />
@@ -203,6 +203,7 @@ runWorkbenchCompile({
     inputDir: "src/styles/scss",
     outputDir: "src/styles/workbench-css",
     assetUrlPrefix: "http://localhost:3000/img/",
+    logs: false,
   },
   demos: {
     inputDir: "src/components/pages",
@@ -214,10 +215,10 @@ runWorkbenchCompile({
 `demos.outputFile` is a project-owned manifest path without extension. The compiler writes a `.js` file:
 
 ```tsx
-import demos from "./myDemos.js";
+import myDemos from "./myDemos.js";
 ```
 
-The manifest holds `{ name, load }` entries only. Demo CSS lives in `export const cssFiles`.
+The generated file exports a variable named after `outputFile` (`myDemos` here). The manifest holds `{ name, load }` entries only. Demo CSS lives in `export const cssFiles`.
 
 Full style compiles clean `styles.outputDir` by default. Pass `clean: false` only when the directory contains files managed elsewhere.
 
@@ -248,13 +249,15 @@ static: [
 ];
 ```
 
-CLI progress is always printed. Pass `styleLogs: false` to hide Sass/CSS compiler output:
+CLI progress is always printed. Pass `styles.logs: false` to hide Sass/CSS compiler output:
 
 ```js
 runWorkbenchCompile({
-  styles: {...},
+  styles: {
+    ...,
+    logs: false,
+  },
   demos: {...},
-  styleLogs: false,
 });
 ```
 

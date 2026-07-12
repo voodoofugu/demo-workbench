@@ -266,7 +266,7 @@ test("runWorkbenchCompile always prints command progress", async () => {
   });
 });
 
-test("runWorkbenchCompile styleLogs only controls Sass/CSS compiler output", async () => {
+test("runWorkbenchCompile styles.logs only controls Sass/CSS compiler output", async () => {
   await withTempDir(async (dir) => {
     const inputDir = path.join(dir, "input");
     const outputDir = path.join(dir, "output");
@@ -276,8 +276,7 @@ test("runWorkbenchCompile styleLogs only controls Sass/CSS compiler output", asy
     const messages = await captureConsoleLog(async () => {
       await runWorkbenchCompile({
         args: [],
-        styleLogs: false,
-        styles: { inputDir, outputDir },
+        styles: { inputDir, outputDir, logs: false },
       });
     });
 
@@ -408,6 +407,7 @@ test("runWorkbenchCompile returns section-shaped styles and demos results", asyn
       ["one.css"],
     );
     assert.deepEqual(result.demos.names, ["AlphaDemo"]);
+    assert.equal(result.demos.exportName, "demos");
     assert.deepEqual(result.demos.outputFiles, [generatedDemoManifestFile]);
     assert.match(
       await readFile(generatedDemoManifestFile, "utf8"),
@@ -432,6 +432,7 @@ test("runWorkbenchCompile discovers sorted module basenames", async () => {
     });
 
     assert.deepEqual(result.demos.names, ["Alpha", "Beta"]);
+    assert.equal(result.demos.exportName, "demosGenerated");
     assert.deepEqual(result.demos.outputFiles, [
       path.join(dir, "generated", "demos.generated.js"),
     ]);
@@ -451,9 +452,10 @@ test("runWorkbenchCompile treats demos.outputFile as a js manifest basename", as
     });
 
     assert.deepEqual(result.demos.outputFiles, [generatedOutputFile]);
+    assert.equal(result.demos.exportName, "myDemos");
     assert.match(
       await readFile(generatedOutputFile, "utf8"),
-      /export default demos;/,
+      /export const myDemos = \[[\s\S]*export default myDemos;/,
     );
   });
 });

@@ -69,6 +69,8 @@ export type WorkbenchCompileStylesOptions = {
   compileForWorkbench?: boolean;
   /** Optional prefix added to relative `url(...)` assets during compilation. Absolute/data/hash URLs are left unchanged. */
   assetUrlPrefix?: string;
+  /** Print Sass/CSS compiler warnings and debug output. Defaults to `true`. Command progress logs are always printed by `runWorkbenchCompile`. */
+  logs?: boolean;
   /** Remove `outputDir` before a full style compile. Defaults to `true`; pass `false` only when the output directory intentionally contains files managed outside `demo-workbench`. Ignored for incremental single-file watch rebuilds. */
   clean?: boolean;
 };
@@ -122,8 +124,6 @@ export type WorkbenchCompileOptions = {
   styles?: WorkbenchCompileStylesOptions;
   /** Optional demo manifest section. */
   demos?: WorkbenchCompileDemoOptions;
-  /** Print Sass/CSS compiler warnings and debug output. Defaults to `true`. Command progress logs are always printed by `runWorkbenchCompile`. */
-  styleLogs?: boolean;
 };
 
 /**---
@@ -152,6 +152,8 @@ export type WorkbenchCompileStylesResult = {
 export type WorkbenchCompileDemoResult = {
   /** Absolute directory that was scanned. */
   inputDir: string;
+  /** Named export generated from the manifest output filename. */
+  exportName: string;
   /** Generated names sorted by filename. */
   names: string[];
   /** Host manifest files written with the generated `{ demos }` data. */
@@ -584,9 +586,9 @@ function appendStyleSourceUrl(css: Uint8Array, outputFile: string) {
 }
 
 function shouldPrintStyleCompilerLogs(
-  options: Pick<WorkbenchCompileOptions, "styleLogs">,
+  options: Pick<WorkbenchCompileStylesOptions, "logs">,
 ) {
-  return options.styleLogs !== false;
+  return options.logs !== false;
 }
 
 const WORKBENCH_LOG_TITLE = "📋 demo-workbench";
@@ -791,6 +793,7 @@ async function compileGeneratedManifest(
   return {
     demos: {
       inputDir: path.resolve(options.demos.inputDir),
+      exportName: manifest.exportName,
       names: demoNames,
       outputFiles: [manifest.outputFile],
     },
@@ -939,7 +942,9 @@ async function compileStyles(
 async function compileWorkbench(
   options: WorkbenchCompileOptions,
 ): Promise<WorkbenchCompileResult> {
-  const styleLogs = shouldPrintStyleCompilerLogs(options);
+  const styleLogs = options.styles
+    ? shouldPrintStyleCompilerLogs(options.styles)
+    : true;
   const styles = options.styles
     ? await compileStyles(options.styles, styleLogs)
     : undefined;
@@ -1228,11 +1233,14 @@ async function compileWatchEvents(
 
   const styles = options.styles
     ? styleDependencyChanged
-      ? await compileStyles(options.styles, shouldPrintStyleCompilerLogs(options))
+      ? await compileStyles(
+          options.styles,
+          shouldPrintStyleCompilerLogs(options.styles),
+        )
       : styleEvents.length
         ? await compileStyles(
             options.styles,
-            shouldPrintStyleCompilerLogs(options),
+            shouldPrintStyleCompilerLogs(options.styles),
             styleEvents,
           )
         : undefined
