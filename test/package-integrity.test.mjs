@@ -80,6 +80,15 @@ test("node package entry exposes only the command runner", async () => {
     nodeTypes,
     /export type \{[^}]*WorkbenchCompileDemoOptions[^}]*WorkbenchCompileStylesOptions[^}]*WorkbenchStyleReloadOptions[^}]*\}/s,
   );
+  assert.match(
+    nodeTypes,
+    /type WorkbenchCompileStylesOptions = \{[\s\S]*Style compiler logging[\s\S]*logs\?: boolean;[\s\S]*\};/,
+  );
+  assert.match(
+    nodeTypes,
+    /type WorkbenchCompileCommandOptions = WorkbenchCompileWatchOptions & \{/,
+  );
+  assert.doesNotMatch(nodeTypes, /\bstyleLogs\b/);
   assert.doesNotMatch(
     nodeTypes,
     /export \{[^}]*\b(?:workbenchCompile|watchWorkbenchCompile|discoverWorkbenchFileNames)\b/,

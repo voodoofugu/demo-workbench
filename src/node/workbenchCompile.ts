@@ -35,13 +35,29 @@ import { toWorkbenchStyleClassName } from "../utils/workbenchStyleScope";
  * ```
  */
 export type WorkbenchCompileStyleFile = {
-  /** File name inside `WorkbenchCompileStylesOptions.inputDir`, for example `button.scss`. */
+  /**
+   * Source style file name.
+   * @description
+   * File name inside `WorkbenchCompileStylesOptions.inputDir`, for example `button.scss`.
+   */
   inputFile: string;
-  /** Generated CSS file name inside `WorkbenchCompileStylesOptions.outputDir`, for example `button.css`. */
+  /**
+   * Generated CSS file name.
+   * @description
+   * File name inside `WorkbenchCompileStylesOptions.outputDir`, for example `button.css`.
+   */
   outputFile: string;
-  /** Absolute path to the source style file. */
+  /**
+   * Absolute source path.
+   * @description
+   * Full path to the source `.css`, `.scss` or `.sass` file that was compiled.
+   */
   inputPath: string;
-  /** Absolute path to the generated CSS file. */
+  /**
+   * Absolute output path.
+   * @description
+   * Full path to the generated minified `.css` file.
+   */
   outputPath: string;
 };
 
@@ -54,24 +70,71 @@ export type WorkbenchCompileStyleFile = {
  * @example
  * ```ts
  * const styles: WorkbenchCompileStylesOptions = {
- *   inputDir: "titans_rc/styles/scss",
- *   outputDir: "src/styles/workbench-css",
+ *   inputDir: "src/styles/scss",
+ *   outputDir: "src/workbench-css",
  *   assetUrlPrefix: "http://localhost:3000/img/",
  * };
  * ```
  */
 export type WorkbenchCompileStylesOptions = {
-  /** Directory with top-level `.css`, `.scss` and `.sass` files. Files starting with `_` are treated as Sass partials and are not emitted directly. */
+  /**
+   * Source style directory.
+   * @description
+   * Directory with top-level `.css`, `.scss` and `.sass` files. Files starting with `_` are treated as Sass partials and are not emitted directly.
+   * @example
+   * ```ts
+   * inputDir: "src/styles/scss"
+   * ```
+   */
   inputDir: string;
-  /** Directory where minified `.css` files are written. */
+  /**
+   * Generated CSS directory.
+   * @description
+   * Directory where the compiler writes minified `.css` files consumed by `DemoWorkbenchProps.styleLoader`.
+   * @example
+   * ```ts
+   * outputDir: "src/workbench-css"
+   * ```
+   */
   outputDir: string;
-  /** Compile CSS for the workbench runtime: scope selectors and append a sourceURL for DevTools. Pass `false` for minimal production CSS output. Defaults to `true`. */
+  /**
+   * Workbench CSS mode.
+   * @description
+   * When `true`, selectors are scoped for demo previews and a sourceURL is appended for DevTools. Pass `false` only when you want minimal production-style CSS output.
+   * @default true
+   */
   compileForWorkbench?: boolean;
-  /** Optional prefix added to relative `url(...)` assets during compilation. Absolute/data/hash URLs are left unchanged. */
+  /**
+   * Asset URL prefix.
+   * @description
+   * Prefix added to relative `url(...)` assets during CSS compilation. Absolute URLs, data URLs and hash URLs are left unchanged.
+   * @example
+   * ```ts
+   * assetUrlPrefix: "http://localhost:3000/img/"
+   * ```
+   */
   assetUrlPrefix?: string;
-  /** Print Sass/CSS compiler warnings and debug output. Defaults to `true`. Command progress logs are always printed by `runWorkbenchCompile`. */
+  /**
+   * Style compiler logging.
+   * @description
+   * Controls Sass/CSS compiler warnings and debug output for this `styles` section. Command progress logs from `runWorkbenchCompile` are still printed.
+   * @default true
+   * @example
+   * ```ts
+   * styles: {
+   *   inputDir: "src/styles/scss",
+   *   outputDir: "src/workbench-css",
+   *   logs: false,
+   * }
+   * ```
+   */
   logs?: boolean;
-  /** Remove `outputDir` before a full style compile. Defaults to `true`; pass `false` only when the output directory intentionally contains files managed outside `demo-workbench`. Ignored for incremental single-file watch rebuilds. */
+  /**
+   * Clean generated CSS before full compile.
+   * @description
+   * Removes `outputDir` before a full style compile. Pass `false` only when the output directory intentionally contains files managed outside `demo-workbench`. Incremental watch rebuilds ignore this option.
+   * @default true
+   */
   clean?: boolean;
 };
 
@@ -84,21 +147,47 @@ export type WorkbenchCompileStylesOptions = {
  * @example
  * ```ts
  * const demos: WorkbenchCompileDemoOptions = {
- *   inputDir: "src/components/pages",
- *   outputFile: "src/components/templateComponents/myDemos",
+ *   inputDir: "src/demos",
+ *   outputFile: "src/workbench/projectDemos",
  * };
  * ```
  */
 export type WorkbenchCompileDemoOptions = {
-  /** Directory with demo page modules. File basenames become demo names. */
+  /**
+   * Demo source directory.
+   * @description
+   * Directory with demo page modules. File basenames become demo names and are sorted into the generated manifest.
+   */
   inputDir: string;
-  /** File extensions to include. Defaults to `.jsx`, `.tsx`, `.js`, `.ts`. */
+  /**
+   * Demo file extensions.
+   * @description
+   * Extensions included while scanning `inputDir`.
+   * @default [".jsx", ".tsx", ".js", ".ts"]
+   */
   extensions?: string[];
-  /** Basenames to exclude from the generated list. Defaults match the internal file discovery rules. */
+  /**
+   * Demo basenames to skip.
+   * @description
+   * Excludes files by basename before extension, useful for helpers or temporary pages that live beside demos.
+   */
   exclude?: string[];
-  /** Host-owned manifest path generated for `<DemoWorkbench demos={demos} />`. Use the desired path without an extension; the compiler writes it as a `.js` file. */
+  /**
+   * Generated manifest path.
+   * @description
+   * Host-owned file generated for `<DemoWorkbench demos={projectDemos} />`. Use the desired path without extension; the compiler writes a `.js` file and names the exported variable from the final path segment.
+   * @example
+   * ```ts
+   * outputFile: "src/workbench/projectDemos"
+   * // writes projectDemos.js with `export const projectDemos = [...]`
+   * ```
+   */
   outputFile: string;
-  /** Import path prefix used by the generated manifest. Defaults to the relative path from `outputFile` to `inputDir`. */
+  /**
+   * Manifest import prefix.
+   * @description
+   * Import path prefix used inside the generated manifest. Defaults to the relative path from `outputFile` to `inputDir`.
+   */
   importPathPrefix?: string;
 };
 
@@ -111,18 +200,26 @@ export type WorkbenchCompileDemoOptions = {
  * @example
  * ```ts
  * runWorkbenchCompile({
- *   styles: { inputDir: "styles/scss", outputDir: "src/workbench-css" },
+ *   styles: { inputDir: "src/styles/scss", outputDir: "src/workbench-css" },
  *   demos: {
- *     inputDir: "src/components/pages",
- *     outputFile: "src/components/templateComponents/myDemos",
+ *     inputDir: "src/demos",
+ *     outputFile: "src/workbench/projectDemos",
  *   },
  * });
  * ```
  */
 export type WorkbenchCompileOptions = {
-  /** Optional style compilation section. */
+  /**
+   * Style compilation section.
+   * @description
+   * Provide this when the workbench should compile host CSS/Sass into generated CSS files.
+   */
   styles?: WorkbenchCompileStylesOptions;
-  /** Optional demo manifest section. */
+  /**
+   * Demo manifest generation section.
+   * @description
+   * Provide this when the workbench should discover demo modules and generate a host-owned manifest file.
+   */
   demos?: WorkbenchCompileDemoOptions;
 };
 
@@ -134,11 +231,23 @@ export type WorkbenchCompileOptions = {
  * In watch mode `files` can contain only the style file that changed. Full compiles return every emitted top-level style file.
  */
 export type WorkbenchCompileStylesResult = {
-  /** Absolute input directory used for this compile. */
+  /**
+   * Absolute source style directory.
+   * @description
+   * Resolved `styles.inputDir` used for this compile.
+   */
   inputDir: string;
-  /** Absolute output directory used for this compile. */
+  /**
+   * Absolute generated CSS directory.
+   * @description
+   * Resolved `styles.outputDir` where generated CSS files were written.
+   */
   outputDir: string;
-  /** Files touched by this compile. In watch mode this can contain only the changed file. */
+  /**
+   * Compiled style files.
+   * @description
+   * Files touched by this compile. In watch mode this can contain only the changed file.
+   */
   files: WorkbenchCompileStyleFile[];
 };
 
@@ -150,13 +259,29 @@ export type WorkbenchCompileStylesResult = {
  * `names` are sorted file basenames. `outputFiles` contains the generated host manifest file.
  */
 export type WorkbenchCompileDemoResult = {
-  /** Absolute directory that was scanned. */
+  /**
+   * Absolute scanned demo directory.
+   * @description
+   * Resolved `demos.inputDir` used for demo discovery.
+   */
   inputDir: string;
-  /** Named export generated from the manifest output filename. */
+  /**
+   * Generated manifest export name.
+   * @description
+   * Named export generated from `demos.outputFile`. For `outputFile: "src/workbench/projectDemos"`, this value is `"projectDemos"`.
+   */
   exportName: string;
-  /** Generated names sorted by filename. */
+  /**
+   * Discovered demo names.
+   * @description
+   * Sorted file basenames written to the generated manifest.
+   */
   names: string[];
-  /** Host manifest files written with the generated `{ demos }` data. */
+  /**
+   * Generated manifest files.
+   * @description
+   * Host-owned files written by demo manifest generation.
+   */
   outputFiles: string[];
 };
 
@@ -168,9 +293,17 @@ export type WorkbenchCompileDemoResult = {
  * The shape mirrors the requested compile sections: `styles` and `demos`. Watch rebuilds may return only the section that changed, for example only `styles` when a single style file is recompiled.
  */
 export type WorkbenchCompileResult = {
-  /** Style compilation result, when `styles` options were compiled. */
+  /**
+   * Style compile result.
+   * @description
+   * Present when a `styles` section was compiled. Watch rebuilds may omit it when only demos changed.
+   */
   styles?: WorkbenchCompileStylesResult;
-  /** Demo manifest result, when `demos` options were compiled. */
+  /**
+   * Demo manifest result.
+   * @description
+   * Present when a `demos` section was compiled. Watch rebuilds may omit it when only styles changed.
+   */
   demos?: WorkbenchCompileDemoResult;
 };
 
@@ -183,25 +316,46 @@ export type WorkbenchCompileResult = {
  * @example
  * ```ts
  * runWorkbenchCompile({
- *   styles: { inputDir: "styles/scss", outputDir: "src/workbench-css" },
+ *   styles: { inputDir: "src/styles/scss", outputDir: "src/workbench-css" },
  *   demos: {
- *     inputDir: "src/components/pages",
- *     outputFile: "src/components/templateComponents/myDemos",
+ *     inputDir: "src/demos",
+ *     outputFile: "src/workbench/projectDemos",
  *   },
  *   args: ["--watch"],
  * });
  * ```
  */
 export type WorkbenchCompileWatchOptions = WorkbenchCompileOptions & {
-  /** Extra files/directories that should retrigger the full compile. */
+  /**
+   * Extra watch paths.
+   * @description
+   * Files or directories that should retrigger a full compile in addition to style and demo inputs.
+   */
   watchPaths?: string[];
-  /** Debounce for bursty editor/Sass writes. Defaults to 80ms. */
+  /**
+   * Watch rebuild debounce.
+   * @description
+   * Debounce in milliseconds for bursty editor or Sass writes.
+   * @default 80
+   */
   debounceMs?: number;
-  /** Starts a small dev-only Server-Sent Events endpoint that notifies the browser when watched styles rebuild. */
+  /**
+   * Dev style reload endpoint.
+   * @description
+   * Starts a small Server-Sent Events endpoint in watch mode so the browser can refresh changed CSS without remounting previews.
+   */
   styleReload?: boolean | WorkbenchStyleReloadOptions;
-  /** Called after each successful compile, including the initial one. */
+  /**
+   * Successful build callback.
+   * @description
+   * Called after each successful compile, including the initial build in watch mode.
+   */
   onBuild?: (result: WorkbenchCompileResult) => void | Promise<void>;
-  /** Called when a rebuild fails; defaults to logging the error. */
+  /**
+   * Watch error callback.
+   * @description
+   * Called when a rebuild fails. If omitted, `runWorkbenchCompile` logs the error and keeps watching.
+   */
   onError?: (error: unknown) => void;
 };
 
@@ -214,18 +368,26 @@ export type WorkbenchCompileWatchOptions = WorkbenchCompileOptions & {
  * @example
  * ```ts
  * runWorkbenchCompile({
- *   styles: { inputDir: "styles/scss", outputDir: "src/workbench-css" },
+ *   styles: { inputDir: "src/styles/scss", outputDir: "src/workbench-css" },
  *   demos: {
- *     inputDir: "src/components/pages",
- *     outputFile: "src/components/templateComponents/myDemos",
+ *     inputDir: "src/demos",
+ *     outputFile: "src/workbench/projectDemos",
  *   },
  * });
  * ```
  */
 export type WorkbenchCompileCommandOptions = WorkbenchCompileWatchOptions & {
-  /** CLI args to inspect for `--watch` or `watch`. Defaults to `process.argv.slice(2)`. */
+  /**
+   * CLI args.
+   * @description
+   * Arguments inspected for `--watch` or `watch`. Defaults to `process.argv.slice(2)` so tiny host scripts can forward their command-line mode automatically.
+   */
   args?: readonly string[];
-  /** Force command watch mode instead of reading `args`. */
+  /**
+   * Force watch mode.
+   * @description
+   * Overrides `args` detection and starts watch mode when `true`.
+   */
   watch?: boolean;
 };
 
@@ -237,11 +399,26 @@ export type WorkbenchCompileCommandOptions = WorkbenchCompileWatchOptions & {
  * When enabled in watch mode, `runWorkbenchCompile` starts a small Server-Sent Events endpoint. The browser can receive changed style names and fetch fresh CSS text without remounting previews.
  */
 export type WorkbenchStyleReloadOptions = {
-  /** Local port for the style reload event stream. Defaults to 38297 and falls back to a free port if that default is busy. */
+  /**
+   * Style reload port.
+   * @description
+   * Local port for the Server-Sent Events stream. If the default is busy, the server falls back to a free port.
+   * @default 38297
+   */
   port?: number;
-  /** Local host for the style reload event stream. Defaults to "127.0.0.1". */
+  /**
+   * Style reload host.
+   * @description
+   * Local host for the Server-Sent Events stream.
+   * @default "127.0.0.1"
+   */
   host?: string;
-  /** HTTP path for the style reload event stream. Defaults to "/demo-workbench-style-events". */
+  /**
+   * Style reload path.
+   * @description
+   * HTTP path for the Server-Sent Events stream.
+   * @default "/demo-workbench-style-events"
+   */
   path?: string;
 };
 
@@ -259,11 +436,23 @@ type WorkbenchStyleReloadManifest = {
  * Call `close()` to stop the underlying chokidar watcher, disable the style reload manifest and close the dev reload server.
  */
 export type WorkbenchCompileWatchResult = {
-  /** The raw chokidar watcher for advanced integrations. */
+  /**
+   * Chokidar watcher.
+   * @description
+   * Raw watcher instance for advanced host integrations.
+   */
   watcher: FSWatcher;
-  /** Dev style reload URL when `styleReload` is enabled. */
+  /**
+   * Style reload URL.
+   * @description
+   * Dev Server-Sent Events URL when `styleReload` is enabled.
+   */
   styleReloadUrl?: string;
-  /** Stop watching files and release resources. */
+  /**
+   * Stop watch mode.
+   * @description
+   * Closes the file watcher, disables the style reload manifest and releases the dev reload server.
+   */
   close: () => Promise<void>;
 };
 
@@ -1435,10 +1624,14 @@ function closeWatcherOnSignal(watcher: WorkbenchCompileWatchResult) {
  * import { runWorkbenchCompile } from "demo-workbench/node";
  *
  * runWorkbenchCompile({
- *   styles: { inputDir: "styles/scss", outputDir: "src/workbench-css" },
+ *   styles: {
+ *     inputDir: "src/styles/scss",
+ *     outputDir: "src/workbench-css",
+ *     logs: false,
+ *   },
  *   demos: {
- *     inputDir: "src/components/pages",
- *     outputFile: "src/components/templateComponents/myDemos",
+ *     inputDir: "src/demos",
+ *     outputFile: "src/workbench/projectDemos",
  *   },
  * });
  * ```

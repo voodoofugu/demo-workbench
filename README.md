@@ -98,10 +98,10 @@ That's it: the package owns the shell; your project owns the screens and styles.
 A demo declares its scoped CSS by exporting `cssFiles` next to the component. Values are compiled file names from `styles.outputDir`, without `.css`:
 
 ```tsx
-// src/screens/GuardianChestsWindow.tsx
-export const cssFiles = ["guardian-chests-window", "screen-superhero"];
+// src/screens/ProfileCardDemo.tsx
+export const cssFiles = ["profile-card", "shared-layout"];
 
-export default function GuardianChestsWindow() {
+export default function ProfileCardDemo() {
   return /* ... */;
 }
 ```
@@ -119,7 +119,7 @@ A demo's default export is a normal React component. The workbench renders it in
 - `children?: ReactNode` — the host overlay from `renderDemoContent`, provided only when opened. Render it wherever the demo wants the project layer.
 
 ```tsx
-export default function GuardianChestsWindow({ isActive, children }) {
+export default function ProfileCardDemo({ isActive, children }) {
   return (
     <div className="screen">
       {isActive ? <HeavyAnimation /> : <StaticPreview />}
@@ -145,13 +145,13 @@ export default function GuardianChestsWindow({ isActive, children }) {
 
 ```tsx
 import DemoWorkbench from "demo-workbench";
-import myDemos from "./myDemos.js";
+import projectDemos from "./workbench/projectDemos.js";
 
 export default function App() {
   return (
     <DemoWorkbench
       title="My Project Demos"
-      demos={myDemos}
+      demos={projectDemos}
       styleLoader={(name) => import(`../css/${name}.css`)}
       baseStyles={["output", "theme"]}
     />
@@ -206,8 +206,8 @@ runWorkbenchCompile({
     logs: false,
   },
   demos: {
-    inputDir: "src/components/pages",
-    outputFile: "src/components/templateComponents/myDemos",
+    inputDir: "src/demos",
+    outputFile: "src/workbench/projectDemos",
   },
 });
 ```
@@ -215,10 +215,10 @@ runWorkbenchCompile({
 `demos.outputFile` is a project-owned manifest path without extension. The compiler writes a `.js` file:
 
 ```tsx
-import myDemos from "./myDemos.js";
+import projectDemos from "./workbench/projectDemos.js";
 ```
 
-The generated file exports a variable named after `outputFile` (`myDemos` here). The manifest holds `{ name, load }` entries only. Demo CSS lives in `export const cssFiles`.
+The generated file exports a variable named after `outputFile` (`projectDemos` here). The manifest holds `{ name, load }` entries only. Demo CSS lives in `export const cssFiles`.
 
 Full style compiles clean `styles.outputDir` by default. Pass `clean: false` only when the directory contains files managed elsewhere.
 

@@ -442,7 +442,7 @@ test("runWorkbenchCompile discovers sorted module basenames", async () => {
 test("runWorkbenchCompile treats demos.outputFile as a js manifest basename", async () => {
   await withTempDir(async (dir) => {
     const inputDir = path.join(dir, "pages");
-    const outputFile = path.join(dir, "src", "components", "templateComponents", "myDemos");
+    const outputFile = path.join(dir, "src", "workbench", "projectDemos");
     const generatedOutputFile = `${outputFile}.js`;
     await mkdir(inputDir, { recursive: true });
     await writeFile(path.join(inputDir, "Dashboard.tsx"), `export default null;\n`);
@@ -452,10 +452,10 @@ test("runWorkbenchCompile treats demos.outputFile as a js manifest basename", as
     });
 
     assert.deepEqual(result.demos.outputFiles, [generatedOutputFile]);
-    assert.equal(result.demos.exportName, "myDemos");
+    assert.equal(result.demos.exportName, "projectDemos");
     assert.match(
       await readFile(generatedOutputFile, "utf8"),
-      /export const myDemos = \[[\s\S]*export default myDemos;/,
+      /export const projectDemos = \[[\s\S]*export default projectDemos;/,
     );
   });
 });

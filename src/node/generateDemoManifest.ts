@@ -11,7 +11,7 @@ import path from "node:path";
  * @example
  * ```ts
  * const options: WorkbenchFileNameDiscoveryOptions = {
- *   inputDir: "src/components/pages",
+ *   inputDir: "src/demos",
  *   exclude: ["Template"],
  * };
  * ```
@@ -157,7 +157,7 @@ async function discoverWorkbenchFiles(
  * @example
  * ```ts
  * const names = await discoverWorkbenchFileNames({
- *   inputDir: "src/components/pages",
+ *   inputDir: "src/demos",
  * });
  * ```
  */
