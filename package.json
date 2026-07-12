@@ -1,6 +1,6 @@
 {
   "name": "demo-workbench",
-  "version": "1.0.0-beta.1",
+  "version": "1.0.0",
   "description": "React demo workbench for browsing and opening project demos/screens.",
   "author": "Georg Schilin",
   "license": "MIT",
@@ -48,8 +48,10 @@
     "check": "npm run typecheck && npm run build && npm test && npm run pack:dry",
     "pack:dry": "npm pack --dry-run",
     "package-prepare": "npm run build && node scripts/prepare-publish.mjs",
-    "release:dry": "npm run package-prepare && npm publish ./publish --dry-run --tag beta",
-    "release": "npm run package-prepare && npm publish ./publish --access public --tag beta",
+    "publish:dry": "npm run package-prepare && npm publish ./publish --dry-run",
+    "publish:public": "npm run package-prepare && npm publish ./publish --access public",
+    "release:dry": "npm run publish:dry",
+    "release": "npm run publish:public",
     "test:node": "node --test test/*.test.mjs",
     "test:dom": "vitest run",
     "test": "npm run package-prepare && npm run test:node && npm run test:dom"

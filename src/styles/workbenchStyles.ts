@@ -345,8 +345,6 @@ const workbenchStyles: StyledAtomStyles = {
     '.demo-workbench-search[data-focus="true"] .demo-workbench-search-input': {
       width: 208,
       pointerEvents: "auto",
-      boxShadow: "inset 0 0 0 1px var(--dw-ring)",
-      outline: "none",
     },
 
     ".demo-workbench-search-button": {
@@ -552,7 +550,6 @@ const workbenchStyles: StyledAtomStyles = {
       animation: "demo-workbench-ident 0.2s ease-in-out 1 forwards",
       alignItems: "center",
       justifyContent: "center",
-      overflow: "hidden",
       borderRadius: 16,
       background: "var(--dw-surface)",
       boxShadow: "inset 0 0 0 1px var(--dw-border), var(--dw-shadow-sm)",
@@ -724,10 +721,11 @@ const workbenchStyles: StyledAtomStyles = {
       color: "var(--dw-text)",
       fontSize: "0.75rem",
       fontWeight: 600,
-      lineHeight: "1.75rem",
+      lineHeight: "1.90rem",
       textAlign: "center",
       textOverflow: "ellipsis",
       whiteSpace: "nowrap",
+      borderRadius: "inherit",
     },
 
     ".demo-workbench-page-overlay": {
@@ -872,6 +870,11 @@ const workbenchStyles: StyledAtomStyles = {
         background: "var(--dw-accent)",
       },
   },
+
+  ".demo-workbench-search-input, .demo-workbench-search-button, .demo-workbench-title, .demo-workbench-theme-option, .demo-workbench-theme-toggle, .demo-workbench-card-link, .demo-workbench-page-close, .demo-workbench-to-top":
+    {
+      outlineColor: "var(--dw-ring)",
+    },
 };
 
 export default workbenchStyles;
