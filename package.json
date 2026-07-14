@@ -1,6 +1,6 @@
 {
   "name": "demo-workbench",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "React demo workbench for browsing and opening project demos/screens.",
   "author": "Georg Schilin",
   "license": "MIT",

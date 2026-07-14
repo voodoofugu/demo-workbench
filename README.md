@@ -17,9 +17,7 @@
 `demo-workbench` is a small React shell for browsing and opening project demos/screens.
 
 Use it for component libraries, visual experiments, scroll demos, style systems and project UI sandboxes.
-
 It is not a docs system or Storybook replacement. It gives you a reusable grid/search/theme/opened-demo shell plus a small compile step.
-
 The package owns the shell. Your project owns the demos, styles and generated manifest file.
 
 <h2></h2>
@@ -47,33 +45,25 @@ Workbench shell styles are injected by the package automatically when `DemoWorkb
 >   switch the mode from the header toggle and the color from the title dropdown; both
 >   choices persist in `localStorage`. No configuration is required.
 
-> **✦ Package manager support:**
->
-> Generate a host-owned demo manifest with `demos.outputFile`.
-> Pass it to `<DemoWorkbench demos={demos} />`; the package never mutates `node_modules`.
-
 <h2></h2>
 
 ### Quick start
 
-**1. Write a compile script.** It generates the demo manifest and compiles your project CSS into scoped, workbench-ready files:
+**1. Compile** — generate the demo manifest and compile your CSS into scoped, workbench-ready files:
 
 ```js
 // scripts/workbenchCompile.js
 import { runWorkbenchCompile } from "demo-workbench/node";
 
 runWorkbenchCompile({
-  styles: {
-    inputDir: "src/styles/scss",
-    outputDir: "src/styles/workbench-css",
-  },
+  styles: { inputDir: "src/styles/scss", outputDir: "src/styles/workbench-css" },
   demos: { inputDir: "src/screens", outputFile: "src/screens/demos" },
 });
 ```
 
-Run it once with `node scripts/workbenchCompile.js`, or add `--watch` in development. Serve `styles.outputDir` at `/workbench-css/` — that one served path powers both jobs: the string `styleLoader` fetches `${prefix}/${name}.css` from it, and in `--watch` mode the workbench reads a small reload manifest there to hot-swap changed styles. (No manifest is written when `styles.compileForWorkbench` is `false`.)
+Run `node scripts/workbenchCompile.js` (add `--watch` for hot style reload) and serve `styles.outputDir` at `/workbench-css/`.
 
-**2. Render the shell** with the generated manifest and a `styleLoader`:
+**2. Render** the shell with the generated manifest:
 
 ```tsx
 import DemoWorkbench from "demo-workbench";
@@ -82,75 +72,15 @@ import demos from "./screens/demos.js";
 export default function App() {
   return (
     <DemoWorkbench
-      title="My Project Demos"
       demos={demos}
       styleLoader="/workbench-css/"
-      baseStyles={["reset", "ui-elements", "keyframes-animations"]}
+      baseStyles={["reset", "ui-elements"]}
     />
   );
 }
 ```
 
-`styleLoader` supports two loading strategies:
-
-1. **URL prefix, recommended.** Serve `styles.outputDir` as static files and pass its public URL prefix:
-
-```tsx
-<DemoWorkbench demos={demos} styleLoader="/workbench-css/" />
-```
-
-`styleLoader="/workbench-css/"` loads `reset` as `/workbench-css/reset.css`. This is the simplest setup and does not require CSS loaders.
-
-2. **Custom function, advanced.** Use this when your app loads CSS from a CDN, needs auth, or your bundler is configured to import CSS as text:
-
-```tsx
-<DemoWorkbench
-  demos={demos}
-  styleLoader={(name) => import(`./workbench-css/${name}.css?raw`)}
-/>
-```
-
-A string `styleLoader` is a public URL prefix, not a filesystem path.
-
-That's it: the package owns the shell; your project owns the screens and styles.
-
-<details id="demo-css"><summary><b>Demo CSS</b></summary><br /><ul><div>
-
-A demo declares its scoped CSS by exporting `cssFiles` next to the component. Values are compiled file names from `styles.outputDir`, without `.css`:
-
-```tsx
-// src/screens/ProfileCardDemo.tsx
-export const cssFiles = ["profile-card", "shared-layout"];
-
-export default function ProfileCardDemo() {
-  return /* ... */;
-}
-```
-
-Use `baseStyles` for shell-wide CSS such as reset, tokens or keyframes. Omit `cssFiles` when a demo needs no scoped CSS.
-
-</div></ul></details>
-
-<details id="demo-component"><summary><b>Demo component props</b></summary><br /><ul><div>
-
-A demo's default export is a normal React component. The workbench renders it in grid and opened modes, and passes `DemoComponentProps`:
-
-- `pageName?: string` — the demo's stable name (its `DemoItem.name`).
-- `isActive?: boolean` — `true` only while opened. Gate expensive work on it.
-- `children?: ReactNode` — the host overlay from `renderDemoContent`, provided only when opened. Render it wherever the demo wants the project layer.
-
-```tsx
-export default function ProfileCardDemo({ isActive, children }) {
-  return (
-    <div className="screen">
-      {isActive ? <HeavyAnimation /> : <StaticPreview />}
-      {children}
-    </div>
-  );
-}
-```
-
-</div></ul></details>
+Each demo is a normal React component that declares its scoped CSS with `export const cssFiles = [...]`. See the [API](#api) for every prop, both `styleLoader` forms, demo component props and all compile options.
 
 <h2></h2>
 
@@ -210,6 +140,65 @@ Use `autoScale` only for demos designed around a known canvas or screen size. Om
 <b>Return:</b><br />
 Returns a React element containing the complete reusable workbench shell.
 
+<br />
+
+<details><summary><b><code>styleLoader</code></b> forms</summary><br /><ul><div>
+
+**URL prefix (recommended).** Serve `styles.outputDir` as static files and pass its public URL prefix; `"/workbench-css/"` loads `reset` from `/workbench-css/reset.css`. It is a public URL prefix, not a filesystem path:
+
+```tsx
+<DemoWorkbench demos={demos} styleLoader="/workbench-css/" />
+```
+
+**Custom function (advanced).** For a CDN, auth, or a bundler that imports CSS as text:
+
+```tsx
+<DemoWorkbench
+  demos={demos}
+  styleLoader={(name) => import(`./workbench-css/${name}.css?raw`)}
+/>
+```
+
+</div></ul></details>
+
+<details id="demo-css"><summary><b>Demo CSS</b></summary><br /><ul><div>
+
+A demo declares its scoped CSS by exporting `cssFiles` next to the component. Values are compiled file names from `styles.outputDir`, without `.css`:
+
+```tsx
+// src/screens/ProfileCardDemo.tsx
+export const cssFiles = ["profile-card", "shared-layout"];
+
+export default function ProfileCardDemo() {
+  return /* ... */;
+}
+```
+
+Use `baseStyles` for shell-wide CSS such as reset, tokens or keyframes. Omit `cssFiles` when a demo needs no scoped CSS.
+
+</div></ul></details>
+
+<details id="demo-component"><summary><b>Demo component props</b> (<code>DemoComponentProps</code>)</summary><br /><ul><div>
+
+A demo's default export is a normal React component. The workbench renders it in grid and opened modes, and passes:
+
+- `pageName?: string` — the demo's stable name (its `DemoItem.name`).
+- `isActive?: boolean` — `true` only while opened. Gate expensive work on it.
+- `children?: ReactNode` — the host overlay from `renderDemoContent`, provided only when opened. Render it wherever the demo wants the project layer.
+
+```tsx
+export default function ProfileCardDemo({ isActive, children }) {
+  return (
+    <div className="screen">
+      {isActive ? <HeavyAnimation /> : <StaticPreview />}
+      {children}
+    </div>
+  );
+}
+```
+
+</div></ul></details>
+
 </div></ul></details>
 
 <h2></h2>
@@ -228,7 +217,6 @@ runWorkbenchCompile({
     inputDir: "src/styles/scss",
     outputDir: "src/styles/workbench-css",
     assetUrlPrefix: "http://localhost:3000/img/",
-    logs: false,
   },
   demos: {
     inputDir: "src/demos",
@@ -237,15 +225,30 @@ runWorkbenchCompile({
 });
 ```
 
-`demos.outputFile` is a project-owned manifest path without extension. The compiler writes a `.js` file:
+Both sections are optional and can be used independently.
+
+<b>`styles` options</b> — compile `.css`/`.scss`/`.sass` into workbench CSS:
+
+- `inputDir` - source dir of top-level style files (`_name` files are Sass partials).
+- `outputDir` - where minified `.css` is written; serve it at `/workbench-css/`.
+- `compileForWorkbench?: boolean` (default `true`) - scope selectors, add a DevTools `sourceURL` and write the reload manifest. `false` = plain production CSS: none of those.
+- `assetUrlPrefix?: string` - prefix prepended to relative `url(...)` assets.
+- `clean?: boolean` (default `true`) - wipe `outputDir` before a full compile. `false` if it holds files managed elsewhere.
+- `logs?: boolean` (default `true`) - Sass/CSS compiler warnings/output. CLI progress is always printed.
+
+<b>`demos` options</b> — discover demos and write the manifest:
+
+- `inputDir` - dir of demo modules; file basenames become demo names.
+- `outputFile` - manifest path without extension (writes a `.js` file, exporting a variable named after the final path segment). Entries are `{ name, load }` only; demo CSS lives in `export const cssFiles`.
+- `extensions?: string[]` (default `[".jsx", ".tsx", ".js", ".ts"]`) - scanned file extensions.
+- `exclude?: string[]` - demo basenames to skip.
+- `importPathPrefix?: string` - import prefix used inside the manifest (defaults to the relative path from `outputFile` to `inputDir`).
+
+Import the generated manifest:
 
 ```tsx
 import projectDemos from "./workbench/projectDemos.js";
 ```
-
-The generated file exports a variable named after `outputFile` (`projectDemos` here). The manifest holds `{ name, load }` entries only. Demo CSS lives in `export const cssFiles`.
-
-Full style compiles clean `styles.outputDir` by default. Pass `clean: false` only when the directory contains files managed elsewhere.
 
 Run it as a command:
 
@@ -272,18 +275,6 @@ static: [
     watch: false,
   },
 ];
-```
-
-CLI progress is always printed. Pass `styles.logs: false` to hide Sass/CSS compiler output:
-
-```js
-runWorkbenchCompile({
-  styles: {
-    ...,
-    logs: false,
-  },
-  demos: {...},
-});
 ```
 
 <b>Description:</b><em><br />

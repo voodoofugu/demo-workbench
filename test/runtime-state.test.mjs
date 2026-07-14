@@ -218,7 +218,7 @@ test("DemoWorkbench keeps stable baseStyles and owns shell styles inline", async
   assert.doesNotMatch(publicTypes, /baseCssVars/);
   assert.match(
     demoWorkbench,
-    /rawHostCssFiles = baseStyles \?\? \["output"\]/,
+    /rawHostCssFiles = baseStyles \?\? \[\]/,
   );
   assert.match(
     demoWorkbench,

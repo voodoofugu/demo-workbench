@@ -23,7 +23,7 @@ function warnMissingStyleLoader(fileNames: readonly string[]) {
 
   warnDevelopment(
     "missing-style-loader",
-    `styleLoader is missing, but styles are requested (${fileNames.join(", ")}). Pass styleLoader or remove baseStyles / demo cssFiles exports.`,
+    `styleLoader is missing, but baseStyles are requested (${fileNames.join(", ")}). Pass styleLoader or remove baseStyles.`,
   );
 }
 
@@ -70,7 +70,7 @@ export default function DemoWorkbench({
   // Configures styled-atom's loader and the dev style-reload pipeline.
   useWorkbenchStyleReload(styleLoader);
 
-  const rawHostCssFiles = baseStyles ?? ["output"];
+  const rawHostCssFiles = baseStyles ?? [];
   const hostCssFiles = useStableStringList(rawHostCssFiles);
 
   // Publish the host base-style names so every DemoCell can build its scoped
